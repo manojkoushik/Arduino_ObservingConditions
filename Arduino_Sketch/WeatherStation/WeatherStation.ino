@@ -8,6 +8,9 @@
 
  Original sketch based on what was written by Nathan Seidle https://github.com/sparkfun/Weather_Shield
 
+ Author: Manoj Koushik (manoj.koushik@gmail.com)
+ Version: 1.0.0
+
  License: This code is public domain. Beers and a thank you are always welcome. 
  
  */
@@ -15,15 +18,18 @@
 #include <Wire.h> //I2C needed for sensors
 #include <SparkFunMPL3115A2.h> //Pressure sensor - Search "SparkFun MPL3115" and install from Library Manager
 #include <SparkFunHTU21D.h> //Humidity sensor - Search "SparkFun HTU21D" and install from Library Manager
-#include <SparkFunMLX90614.h> // MLX90614 IR thermometer library
-#include <SerialCommand.h> // Serial command library
+#include <SparkFunMLX90614.h> // MLX90614 IR thermometer library https://github.com/sparkfun/SparkFun_MLX90614_Arduino_Library
+#include <SerialCommand.h> // Serial command library https://github.com/kroimon/Arduino-SerialCommand
 
+// Weather Objects to read sensors
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 MPL3115A2 myPressure; //Create an instance of the pressure sensor
 HTU21D myHumidity; //Create an instance of the humidity sensor
 IRTherm myIRSkyTemp; // Create an IRTherm object called temp
 SerialCommand myDeviceCmd; // Create a serial command object to deal with Ascom Driver
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-//Hardware pin definitions
+// Hardware pin definitions
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // digital I/O pins
 const byte WSPEED = 3;
@@ -38,43 +44,53 @@ const byte BATT = A2;
 const byte WDIR = A0;
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
-//Global Variables
+// Constants
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+const byte  WINDGUST_PERIOD = 120;
+const byte  RAIN_PERIOD = 60;
+const float INCHES_TO_MM = 25.4;
+const byte  SWITCH_BOUNCE = 10;
+const float RAIN_PER_INT = 0.011;
+const int   MSECS_TO_SEC = 1000;
+const byte  SECS_TO_MIN = 60;
+const byte  MINS_TO_HOUR = 60;
+const float SPEED_PER_WINDCLICK = 1.492;
+const float MPH_TO_MS = 0.44704;
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+// Global Variables to keep track of things
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+// Various timers and indices
 long lastSecond; //The millis counter to see when a second rolls by
-byte seconds; //When it hits 60, increase the current minute
-byte minutes; //Keeps track of where we are in various arrays of data
+byte seconds = 0; //When it hits 60, increase the current minute
+byte minutes = 0; //Keeps track of where we are in various arrays of data
+byte windspeed_hist_secs = 0;
 
 long          lastWindCheck = 0;
-long          windGustTimeStamp = 0;
 volatile long lastWindIRQ = 0;
 volatile byte windClicks = 0;
 
-long          lastWindGustCheck = 0; // Used to calculate wind gust over 3 seconds 
-byte          windGustClicks = 0; // Used to calculate wind gust over 3 seconds 
-byte          currentWindGust = 0; // Used to find max wind gust over 2 minutes
-
-volatile float rainHour[60]; //60 floating numbers to keep track of 60 minutes of rain
-
-//These are all the weather values that wunderground expects:
-int            winddir = 0; // [0-360 instantaneous wind direction]
-float          windspeed = 0; // [m/s instantaneous wind speed]
-float          windgust_2m[40]; // [m/s current wind gust. Collect over 2m in a rolling buffer]
-
-float          humidity = 0; // [%]
-float          pressure = 0;
-
-float          pTempc = 0; // [Ambient temperature C, from pressure sensor]
-float          hTempc = 0; // [Ambient temperature C from humidity sensor]
-float          irTempc = 0; // [Ambient temperature C from IR sensor]
-float          irSkyTempc = 0; // [Sky temperature C from IR sensor]
-float          rainin = 0; // [rain inches over the past hour)] -- the accumulated rainfall in the past 60 min
-
-float batt_lvl = 11.8; //[analog value from 0 to 1023]
-float light_lvl = 455; //[analog value from 0 to 1023]
-
 // volatiles are subject to modification by IRQs
-volatile unsigned long raintime, rainlast, raininterval, rain;
+volatile float rainHour[60]; //60 floating numbers to keep track of 60 minutes of rain
+volatile unsigned long raintime, rainlast, raininterval;
 
+float windspeed_hist[120];
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+// Global Variables keeping track of weather parameters
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+int   winddir = 0; // [0-360 instantaneous wind direction]
+float windspeed = 0; // [m/s instantaneous wind speed]
+
+float humidity = 0; // [%]
+float pressure = 0;
+
+float pTempc = 0; // [Ambient temperature C, from pressure sensor]
+float hTempc = 0; // [Ambient temperature C from humidity sensor]
+float irTempc = 0; // [Ambient temperature C from IR sensor]
+float irSkyTempc = 0; // [Sky temperature C from IR sensor]
+
+float light_lvl = 455; //[analog value from 0 to 1023]
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 //Interrupt routines (these are called by the hardware interrupts, not by the main code)
@@ -86,9 +102,9 @@ void rainIRQ()
   raintime = millis(); // grab current time
   raininterval = raintime - rainlast; // calculate interval between this and last event
 
-  if (raininterval > 10) // ignore switch-bounce glitches less than 10mS after initial edge
+  if (raininterval > SWITCH_BOUNCE) // ignore switch-bounce glitches less than 10mS after initial edge
   {
-    rainHour[minutes] += 0.011; //Increase this minute's amount of rain
+    rainHour[minutes] += RAIN_PER_INT; //Increase this minute's amount of rain
     rainlast = raintime; // set up for next event
   }
 }
@@ -96,17 +112,21 @@ void rainIRQ()
 void wspeedIRQ()
 // Activated by the magnet in the anemometer (2 ticks per rotation), attached to input D3
 {
-  if (millis() - lastWindIRQ > 10) // Ignore switch-bounce glitches less than 10ms (142MPH max reading) after the reed switch closes
+  if (millis() - lastWindIRQ > SWITCH_BOUNCE) // Ignore switch-bounce glitches less than 10ms (142MPH max reading) after the reed switch closes
   {
     lastWindIRQ = millis(); //Grab the current time
     windClicks++; //There is 1.492MPH for each click per second.
   }
 }
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
 void setup()
 {
   Serial.begin(9600);
+
+  // Debug
+  Serial.println("Booting up Weather Station...");
 
   pinMode(STAT1, OUTPUT); //Status LED Blue
   pinMode(STAT2, OUTPUT); //Status LED Green
@@ -126,7 +146,6 @@ void setup()
   //Configure the humidity sensor
   myHumidity.begin();
 
-  seconds = 0;
   lastSecond = millis();
 
   // attach external interrupt pins to IRQ functions
@@ -168,13 +187,21 @@ void setup()
   myDeviceCmd.addCommand("WindGust", WindGust); // Wind gust (Ascom needs m/s) Peak 3 second wind speed over the last 2 minutes
   myDeviceCmd.addCommand("WindSpeed", WindSpeed); // Wind speed (Ascom needs m/s)
 
-  myDeviceCmd.addCommand("WeatherDebug", printWeather); // Wind speed (Ascom needs m/s)
+  myDeviceCmd.addCommand("WeatherDebug", printWeather); // Used to debug and print out all weather parameters
+
+  // Zero out the arrays
+  int i;
+  for (i = 0; i < WINDGUST_PERIOD; i++)
+    windspeed_hist[i] = 0;
+ 
+  for (i = 0; i < RAIN_PERIOD; i++)
+    rainHour[i] = 0;
 
   // turn on interrupts
   interrupts();
 
-  Serial.println("Observatory Weather Station online!");
-  
+  // Debug
+  Serial.println("Observatory Weather Station online!");  
 }
 
 void Humidity()
@@ -189,7 +216,12 @@ void Pressure()
 
 void RainRate()
 {
-  float rainRate = rainin * 25.4;
+  float rainRate;
+
+  for (int i; i < RAIN_PERIOD; i++)
+    rainRate += rainHour[i];
+
+  rainRate *= INCHES_TO_MM;
   Serial.println(rainRate,5);
 }
 
@@ -215,10 +247,19 @@ void WindSpeed()
 
 void WindGust()
 {
+  float peakwindgust = 0;
   float windgust = 0;
-  for (int i = 0; i < 40; i++)
-    if (windgust_2m[i] > windgust)
-      windgust = windgust_2m[i];
+  for (int i = 0; i < WINDGUST_PERIOD; i++)
+  {
+    int j = i + 1;
+    if (j >= WINDGUST_PERIOD) j = 0;
+    int k = j + 1;
+    if (k >= WINDGUST_PERIOD) k = 0;
+
+    windgust = (windspeed_hist[i] + windspeed_hist[j] + windspeed_hist[k])/3;
+
+    if (windgust > peakwindgust) peakwindgust = windgust;
+  }
       
   Serial.println(windgust,5);
 }
@@ -231,11 +272,11 @@ void WindDirection()
 void loop()
 {
   //Keep track of which minute it is
-  if(millis() - lastSecond >= 1000)
+  if(millis() - lastSecond >= MSECS_TO_SEC)
   {
     digitalWrite(STAT1, HIGH); //Blink stat LED
 
-    lastSecond += 1000;
+    lastSecond += MSECS_TO_SEC;
 
     // Calculate all weather readings
     calcWeather();
@@ -273,27 +314,22 @@ void calcWeather()
 
     // Calc Wind
   calc_wind();
-
-  if(++seconds > 59)
-  {
-    seconds = 0;
-    if(++minutes > 59) minutes = 0;
-    rainHour[minutes] = 0; //Zero out this minute's rainfall amount
-  }
 }
 
 void calc_rain()
 {
-  //Calculate amount of rainfall for the last 60 minutes
-  rainin = 0;
-  for(int i = 0 ; i < 60 ; i++)
-    rainin += rainHour[i];
-  
+  if(++seconds >= SECS_TO_MIN)
+  {
+    seconds = 0;
+    if(++minutes >= MINS_TO_HOUR) minutes = 0;
+    rainHour[minutes] = 0; //Zero out this minute's rainfall amount
+  }
 }
 
 void calc_wind()
 {
   // Wind Direction
+
   unsigned int adc;
 
   adc = analogRead(WDIR); // get the current reading from the sensor
@@ -321,38 +357,27 @@ void calc_wind()
   if (adc < 990) winddir = 270;
 
   // WindSpeed
+  // Interrupt adds up the clicks. Each click is 1.492MPH of additional speed
   
   float deltaTime = millis() - lastWindCheck; //750ms
+  lastWindCheck = millis();
 
-  deltaTime /= 1000.0; //Covert to seconds
+  deltaTime /= MSECS_TO_SEC; //Covert to seconds
 
   windspeed = (float)windClicks / deltaTime; //3 / 0.750s = 4
-  windspeed *= 1.492; //4 * 1.492 = 5.968MPH
-  windspeed *= 0.44704; // Convert to m/s
-  lastWindCheck = millis();
-  
-  //WindGust
-  // Calculate the average wind speed over the last 3 seconds
-  float windGustDeltaTime = millis() - lastWindGustCheck;
-  if (windGustDeltaTime < 3000)
-  {
-    windGustClicks += windClicks;
-  } else {
-    float windgust = (float)windGustClicks / windGustDeltaTime;
-
-    windgust *= 1.492;
-    windgust *= 0.44704;
-
-    if (++currentWindGust > 39)
-      currentWindGust = 0;
-
-    windgust_2m[currentWindGust] = windgust;
-    
-    lastWindGustCheck = millis();
-  }
-
   windClicks = 0; //Reset and start watching for new wind
 
+  windspeed *= SPEED_PER_WINDCLICK; //4 * 1.492 = 5.968MPH
+  windspeed *= MPH_TO_MS; // Convert to m/s
+
+  // To calculate windgust we keep a 2 minute rolling history of instantaneous windspeed
+  // Ascom needs 3 second gust over 2 minutes
+
+  windspeed_hist[windspeed_hist_secs] = windspeed;
+  if (++windspeed_hist_secs > (WINDGUST_PERIOD - 1))
+    windspeed_hist_secs = 0;
+  //zero out this seconds windspeed history  
+  windspeed_hist[windspeed_hist_secs] = 0;  
 }
 
 //Returns the voltage of the light sensor based on the 3.3V rail
@@ -370,12 +395,6 @@ float get_light_level()
   return(lightSensor);
 }
 
-//Prints the various variables directly to the port
-//I don't like the way this function is written but Arduino doesn't support floats under sprintf
 void printWeather()
 {
-  Serial.println();
-
-  Serial.print("$,winddir=");
-  Serial.print(winddir);
 }
