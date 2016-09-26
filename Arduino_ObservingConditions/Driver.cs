@@ -255,7 +255,6 @@ namespace ASCOM.Arduino
 
 
         public void CommandBlind(string command, bool raw)
-            }
         {
             throw new ASCOM.MethodNotImplementedException("CommandBlind");
         }
