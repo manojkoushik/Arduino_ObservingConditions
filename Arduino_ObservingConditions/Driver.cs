@@ -144,7 +144,18 @@ namespace ASCOM.Arduino
             {
                 tl.LogMessage("SupportedActions Get", "Returning list...");
                 ArrayList supportedActions = new ArrayList();
+
                 supportedActions.Add("Humidity");
+                supportedActions.Add("Pressure");
+                supportedActions.Add("CloudCover");
+                supportedActions.Add("DewPoint");
+                supportedActions.Add("RainRate");
+                supportedActions.Add("SkyBrightness");
+                supportedActions.Add("SkyTemperature");
+                supportedActions.Add("Temperature");
+                supportedActions.Add("WindGust");
+                supportedActions.Add("WindSpeed");
+                supportedActions.Add("WindDirection");
 
                 return supportedActions;
             }
@@ -154,11 +165,97 @@ namespace ASCOM.Arduino
         public string Action(string actionName, string actionParameters)
         {
             LogMessage("Action", "ActionName {0}, ActionParameters {1} called", actionName, actionParameters);
-            // TODO IMPLEMENT ALL SENSORS here. 
-            throw new ASCOM.ActionNotImplementedException("Action " + actionName + " is not implemented by this driver");
+
+            string deviceType = actionName.Substring(0, actionName.IndexOf(':'));
+            string action = actionName.Substring(actionName.IndexOf(':') + 1);
+
+            if (!deviceType.Equals("ArduinoWeatherStation", StringComparison.OrdinalIgnoreCase))
+            {
+                return "";
+            }
+
+            if (action.Equals("Humidity", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("HumidityValue", false);
+                } else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("HumidityDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            } else if (action.Equals("Pressure", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("PressureValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("PressureDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else if (action.Equals("SkyBrightness", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyBrightnessValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyBrightnessDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else if (action.Equals("Temperature", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("TemperatureValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("TemperatureDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else if (action.Equals("SkyTemperature", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyTemperatureValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyTemperatureDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else
+            {
+                return "";
+            }
         }
 
+
         public void CommandBlind(string command, bool raw)
+            }
         {
             throw new ASCOM.MethodNotImplementedException("CommandBlind");
         }
