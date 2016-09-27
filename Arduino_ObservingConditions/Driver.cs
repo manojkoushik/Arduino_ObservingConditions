@@ -1,29 +1,19 @@
-//tabs=4
 // --------------------------------------------------------------------------------
-// TODO fill in this information for your driver, then remove this line!
 //
 // ASCOM ObservingConditions driver for Arduino
 //
-// Description:	Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam 
-//				nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam 
-//				erat, sed diam voluptua. At vero eos et accusam et justo duo 
-//				dolores et ea rebum. Stet clita kasd gubergren, no sea takimata 
-//				sanctus est Lorem ipsum dolor sit amet.
+// Description:	A weather station built around Arduino and Weather shield.  
+//				Based on Arduino Uno, Sparkfun weather shield https://www.sparkfun.com/products/12081
+//              and Sparkfun weather meters: https://www.sparkfun.com/products/8942
+//              Also using Melexis 90614 IR Sensor for sky temperature and cloud detection
+//				The Arduino sketch is available from the same git repo. And also a detailed build report
 //
-// Implements:	ASCOM ObservingConditions interface version: <To be completed by driver developer>
-// Author:		(XXX) Your N. Here <your@email.here>
+// Implements:	ASCOM ObservingConditions interface version: 1.0.0
+// Author:		Manoj Koushik (manoj.koushik@gmail.com
 //
-// Edit Log:
-//
-// Date			Who	Vers	Description
-// -----------	---	-----	-------------------------------------------------------
-// dd-mmm-yyyy	XXX	6.0.0	Initial edit, created from ASCOM driver template
 // --------------------------------------------------------------------------------
-//
 
 
-// This is used to define code in the template that is specific to one class implementation
-// unused code canbe deleted and this definition removed.
 #define ObservingConditions
 
 using System;
@@ -49,9 +39,6 @@ namespace ASCOM.Arduino
     // The ClassInterface/None addribute prevents an empty interface called
     // _Arduino from being created and used as the [default] interface
     //
-    // TODO Replace the not implemented exceptions with code to implement the function or
-    // throw the appropriate ASCOM exception.
-    //
 
     /// <summary>
     /// ASCOM ObservingConditions Driver for Arduino.
@@ -76,7 +63,11 @@ namespace ASCOM.Arduino
         internal static string traceStateProfileName = "Trace Level";
         internal static string traceStateDefault = "false";
 
+        internal static int RECEIVE_TIMEOUT = 3;
+
         internal static string comPort; // Variables to hold the currrent device configuration
+
+        private Serial arduino;
 
         /// <summary>
         /// Private variable to hold the connected state
@@ -151,45 +142,138 @@ namespace ASCOM.Arduino
         {
             get
             {
-                tl.LogMessage("SupportedActions Get", "Returning empty arraylist");
-                return new ArrayList();
+                tl.LogMessage("SupportedActions Get", "Returning list...");
+                ArrayList supportedActions = new ArrayList();
+
+                supportedActions.Add("Humidity");
+                supportedActions.Add("Pressure");
+                supportedActions.Add("CloudCover");
+                supportedActions.Add("DewPoint");
+                supportedActions.Add("RainRate");
+                supportedActions.Add("SkyBrightness");
+                supportedActions.Add("SkyTemperature");
+                supportedActions.Add("Temperature");
+                supportedActions.Add("WindGust");
+                supportedActions.Add("WindSpeed");
+                supportedActions.Add("WindDirection");
+
+                return supportedActions;
             }
         }
 
+        // Query Weather Station sensors directly 
         public string Action(string actionName, string actionParameters)
         {
-            LogMessage("", "Action {0}, parameters {1} not implemented", actionName, actionParameters);
-            throw new ASCOM.ActionNotImplementedException("Action " + actionName + " is not implemented by this driver");
+            LogMessage("Action", "ActionName {0}, ActionParameters {1} called", actionName, actionParameters);
+
+            string deviceType = actionName.Substring(0, actionName.IndexOf(':'));
+            string action = actionName.Substring(actionName.IndexOf(':') + 1);
+
+            if (!deviceType.Equals("ArduinoWeatherStation", StringComparison.OrdinalIgnoreCase))
+            {
+                return "";
+            }
+
+            if (action.Equals("Humidity", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("HumidityValue", false);
+                } else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("HumidityDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            } else if (action.Equals("Pressure", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("PressureValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("PressureDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else if (action.Equals("SkyBrightness", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyBrightnessValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyBrightnessDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else if (action.Equals("Temperature", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("TemperatureValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("TemperatureDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else if (action.Equals("SkyTemperature", StringComparison.OrdinalIgnoreCase))
+            {
+                if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyTemperatureValue", false);
+                }
+                else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
+                {
+                    CommandString("SkyTemperatureDesciption", false);
+                }
+                else
+                {
+                    return "";
+                }
+            }
+            else
+            {
+                return "";
+            }
         }
+
 
         public void CommandBlind(string command, bool raw)
         {
-            CheckConnected("CommandBlind");
-            // Call CommandString and return as soon as it finishes
-            this.CommandString(command, raw);
-            // or
             throw new ASCOM.MethodNotImplementedException("CommandBlind");
-            // DO NOT have both these sections!  One or the other
         }
 
         public bool CommandBool(string command, bool raw)
         {
-            CheckConnected("CommandBool");
-            string ret = CommandString(command, raw);
-            // TODO decode the return string and return true or false
-            // or
             throw new ASCOM.MethodNotImplementedException("CommandBool");
-            // DO NOT have both these sections!  One or the other
         }
 
         public string CommandString(string command, bool raw)
         {
             CheckConnected("CommandString");
-            // it's a good idea to put all the low level communication with the device here,
-            // then all communication calls this function
-            // you need something to ensure that only one command is in progress at a time
 
-            throw new ASCOM.MethodNotImplementedException("CommandString");
+            arduino.ClearBuffers();
+            arduino.Transmit(command);
+
+            arduino.ReceiveTimeout = RECEIVE_TIMEOUT;  // Timeout 3 sec
+
+            return arduino.ReceiveTerminated("\n\r");   // Wait for terminated character
         }
 
         public void Dispose()
@@ -219,15 +303,29 @@ namespace ASCOM.Arduino
 
                 if (value)
                 {
-                    connectedState = true;
                     LogMessage("Connected Set", "Connecting to port {0}", comPort);
-                    // TODO connect to the device
+                    try
+                    {
+                        arduino = new Serial();
+                        arduino.PortName = comPort;
+                        arduino.Speed = SerialSpeed.ps9600;
+                        arduino.Connected = true;
+                                               
+                    }
+                    catch (Exception e)
+                    {
+                        LogMessage("Could not connect to port {0}", comPort);
+                        throw new ASCOM.NotConnectedException("Could not connect to port ", e);
+                    }
+                    connectedState = true;
                 }
                 else
                 {
+                    LogMessage("Connected Unset", "Disconnecting to port {0}", comPort);
+
+                    if (arduino && arduino.Connected)
+                        arduino.Connected = false;
                     connectedState = false;
-                    LogMessage("Connected Set", "Disconnecting from port {0}", comPort);
-                    // TODO disconnect from the device
                 }
             }
         }
@@ -247,8 +345,7 @@ namespace ASCOM.Arduino
             get
             {
                 Version version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-                // TODO customise this driver description
-                string driverInfo = "Information about the driver itself. Version: " + String.Format(CultureInfo.InvariantCulture, "{0}.{1}", version.Major, version.Minor);
+                string driverInfo = "Ascom Observing Conditions driver based on Arduino. Version: " + String.Format(CultureInfo.InvariantCulture, "{0}.{1}", version.Major, version.Minor);
                 tl.LogMessage("DriverInfo Get", driverInfo);
                 return driverInfo;
             }
@@ -279,7 +376,7 @@ namespace ASCOM.Arduino
         {
             get
             {
-                string name = "Short driver name - please customise";
+                string name = "Arduino Observing Conditions";
                 tl.LogMessage("Name Get", name);
                 return name;
             }
@@ -353,8 +450,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("Humidity", "get - not implemented");
-                throw new PropertyNotImplementedException("Humidity", false);
+                LogMessage("Humidity", "get");
+                return double.Parse(CommandString("Humidity", false));
             }
         }
 
@@ -370,8 +467,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("Pressure", "get - not implemented");
-                throw new PropertyNotImplementedException("Pressure", false);
+                LogMessage("Pressure", "get");
+                return double.Parse(CommandString("Pressure", false));
             }
         }
 
@@ -386,8 +483,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("RainRate", "get - not implemented");
-                throw new PropertyNotImplementedException("RainRate", false);
+                LogMessage("RainRate", "get");
+                return double.Parse(CommandString("RainRate", false));
             }
         }
 
@@ -478,8 +575,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("SkyTemperature", "get - not implemented");
-                throw new PropertyNotImplementedException("SkyTemperature", false);
+                LogMessage("SkyTemperature", "get");
+                return double.Parse(CommandString("SkyTemperature", false));
             }
         }
 
@@ -490,8 +587,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("Temperature", "get - not implemented");
-                throw new PropertyNotImplementedException("Temperature", false);
+                LogMessage("Temperature", "get");
+                return double.Parse(CommandString("Temperature", false));
             }
         }
 
@@ -550,8 +647,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("WindDirection", "get - not implemented");
-                throw new PropertyNotImplementedException("WindDirection", false);
+                LogMessage("WindDirection", "get");
+                return double.Parse(CommandString("WindDirection", false));
             }
         }
 
@@ -562,8 +659,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("WindGust", "get - not implemented");
-                throw new PropertyNotImplementedException("WindGust", false);
+                LogMessage("WindGust", "get");
+                return double.Parse(CommandString("WindGust", false));
             }
         }
 
@@ -574,8 +671,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("WindSpeed", "get - not implemented");
-                throw new PropertyNotImplementedException("WindSpeed", false);
+                LogMessage("WindSpeed", "get");
+                return double.Parse(CommandString("WindSpeed", false));
             }
         }
 
