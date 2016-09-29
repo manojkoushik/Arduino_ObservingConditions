@@ -27,8 +27,8 @@ MPL3115A2 myPressure; //Create an instance of the pressure sensor
 HTU21D myHumidity; //Create an instance of the humidity sensor
 IRTherm myIRSkyTemp; // Create an IRTherm object called temp
 SerialCommand myDeviceCmd; // Create a serial command object to deal with Ascom Driver
-//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Hardware pin definitions
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // digital I/O pins
@@ -42,29 +42,27 @@ const byte REFERENCE_3V3 = A3;
 const byte LIGHT = A1;
 const byte BATT = A2;
 const byte WDIR = A0;
-//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Constants
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-const byte  WINDGUST_PERIOD = 120;
+const byte  WINDGUST_MAX_PERIOD = 40;
+const byte  WINDGUST_AVG_PERIOD = 3;
 const byte  RAIN_PERIOD = 60;
-const float INCHES_TO_MM = 25.4;
 const byte  SWITCH_BOUNCE = 10;
 const float RAIN_PER_INT = 0.011;
 const int   MSECS_TO_SEC = 1000;
 const byte  SECS_TO_MIN = 60;
 const byte  MINS_TO_HOUR = 60;
 const float SPEED_PER_WINDCLICK = 1.492;
-const float MPH_TO_MS = 0.44704;
-//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Global Variables to keep track of things
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Various timers and indices
 long lastSecond; //The millis counter to see when a second rolls by
 byte seconds = 0; //When it hits 60, increase the current minute
 byte minutes = 0; //Keeps track of where we are in various arrays of data
-byte windspeed_hist_secs = 0;
 
 long          lastWindCheck = 0;
 volatile long lastWindIRQ = 0;
@@ -74,27 +72,16 @@ volatile byte windClicks = 0;
 volatile float rainHour[60]; //60 floating numbers to keep track of 60 minutes of rain
 volatile unsigned long raintime, rainlast, raininterval;
 
-float windspeed_hist[120];
-//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-// Global Variables keeping track of weather parameters
-//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-int   winddir = 0; // [0-360 instantaneous wind direction]
 float windspeed = 0; // [m/s instantaneous wind speed]
+float windgusts[40]; // Keep track of 3s windgusts over the last 2 minutes
+byte  windgusts_index = 0; // Index to track wind gusts over the last two minutes
+float windgust_calc[WINDGUST_AVG_PERIOD - 1]; // keep the last 2 wind speeds (plus the current) to calculate windgust 
+byte  windgust_calc_index = 0; // Index to keep track of these 3 wind speeds 
 
-float humidity = 0; // [%]
-float pressure = 0;
-
-float pTempc = 0; // [Ambient temperature C, from pressure sensor]
-float hTempc = 0; // [Ambient temperature C from humidity sensor]
-float irTempc = 0; // [Ambient temperature C from IR sensor]
-float irSkyTempc = 0; // [Sky temperature C from IR sensor]
-
-float light_lvl = 455; //[analog value from 0 to 1023]
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
 //Interrupt routines (these are called by the hardware interrupts, not by the main code)
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 void rainIRQ()
 // Count rain gauge bucket tips as they occur
 // Activated by the magnet and reed switch in the rain gauge, attached to input D2
@@ -153,7 +140,7 @@ void setup()
   attachInterrupt(1, wspeedIRQ, FALLING);
 
   myIRSkyTemp.begin(); // Initialize I2C library and the MLX90614
-  myIRSkyTemp.setUnit(TEMP_C); // Set units to Farenheit (alternatively TEMP_C or TEMP_K)
+  myIRSkyTemp.setUnit(TEMP_C); // Set units to Centigrade (alternatively TEMP_C or TEMP_K)
 
   // Add all command to support Ascom
   //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -194,11 +181,11 @@ void setup()
   // Add commands for Action property of Ascom Driver
   //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   // Support for Value
-  myDeviceCmd.addCommand("HumidityValue", HumidityValue);
-  myDeviceCmd.addCommand("PressureValue", PressureValue);
-  myDeviceCmd.addCommand("SkyTemperatureValue", SkyTemperatureValue);
-  myDeviceCmd.addCommand("TemperatureValue", TemperatureValue);
-  myDeviceCmd.addCommand("SkyBrightnessValue", SkyBrightnessValue);
+  myDeviceCmd.addCommand("HumidityValue", Humidity);
+  myDeviceCmd.addCommand("PressureValue", Pressure);
+  myDeviceCmd.addCommand("SkyTemperatureValue", SkyTemperature);
+  myDeviceCmd.addCommand("TemperatureValue", Temperature);
+  myDeviceCmd.addCommand("SkyBrightnessValue", SkyBrightness);
 
   // Support for Description
   myDeviceCmd.addCommand("HumidityDescription", HumidityDescription);
@@ -214,11 +201,14 @@ void setup()
 
   // Zero out the arrays
   int i;
-  for (i = 0; i < WINDGUST_PERIOD; i++)
-    windspeed_hist[i] = 0;
+  for (i = 0; i < WINDGUST_MAX_PERIOD; i++)
+    windgusts[i] = 0;
  
   for (i = 0; i < RAIN_PERIOD; i++)
     rainHour[i] = 0;
+
+  for (i = 0; i < WINDGUST_AVG_PERIOD - 1; i++)
+    windgust_calc[i] = 0;
 
   // turn on interrupts
   interrupts();
@@ -227,22 +217,13 @@ void setup()
   Serial.println("Observatory Weather Station online!");  
 }
 
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Commands for Action property of Ascom Driver
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-void HumidityValue()
-{
-  Humidity();
-}
 
 void HumidityDescription()
 {
   Serial.println("HTU21D");
-}
-
-void PressureValue()
-{
-  Pressure();
 }
 
 void PressureDescription()
@@ -250,29 +231,14 @@ void PressureDescription()
   Serial.println("MPL3115A2");
 }
 
-void SkyTemperatureValue()
-{
-  SkyTemperature();
-}
-
 void SkyTemperatureDescription()
 {
   Serial.println("MLX90614");
 }
 
-void TemperatureValue()
-{
-  Temperature();
-}
-
 void TemperatureDescription()
 {
   Serial.println("MLX90614");
-}
-
-void SkyBrightnessValue()
-{
-  SkyBrightness();
 }
 
 void SkyBrightnessDescription()
@@ -281,18 +247,17 @@ void SkyBrightnessDescription()
 }
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
 // Ascom command handlers
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 void Humidity()
 {
-  Serial.println(humidity,5);
+  Serial.println(myHumidity.readHumidity(),5);
 }
 
 void Pressure()
 {
-  Serial.println(pressure,5);
+  Serial.println(myPressure.readPressure(),5);
 }
 
 void RainRate()
@@ -302,7 +267,6 @@ void RainRate()
   for (int i; i < RAIN_PERIOD; i++)
     rainRate += rainHour[i];
 
-  rainRate *= INCHES_TO_MM;
   Serial.println(rainRate,5);
 }
 
@@ -313,31 +277,37 @@ void SkyBrightness()
 
 void SkyTemperature()
 {
-  Serial.println(irSkyTempc,5);
+  if (myIRSkyTemp.read()) // Read from the sensor
+  { 
+    // If the read is successful:
+    Serial.println(myIRSkyTemp.object(),5);
+    float irTempc = myIRSkyTemp.ambient(); // Get updated ambient temperature
+  } else
+  {
+    Serial.println("");
+  }
 }
 
 void Temperature()
 {
-  Serial.println(irTempc,5);
+  if (myIRSkyTemp.read()) // Read from the sensor
+  { 
+    // If the read is successful:
+    Serial.println(myIRSkyTemp.ambient(),5);
+  } else
+  {
+    Serial.println("");
+  }
 }
 
 void WindGust()
 {
   float peakwindgust = 0;
-  float windgust = 0;
-  for (int i = 0; i < WINDGUST_PERIOD; i++)
-  {
-    int j = i + 1;
-    if (j >= WINDGUST_PERIOD) j = 0;
-    int k = j + 1;
-    if (k >= WINDGUST_PERIOD) k = 0;
-
-    windgust = (windspeed_hist[i] + windspeed_hist[j] + windspeed_hist[k])/3;
-
-    if (windgust > peakwindgust) peakwindgust = windgust;
-  }
+  for (int i = 0; i < WINDGUST_MAX_PERIOD; i++)
+    if (windgusts[i] > peakwindgust)
+      peakwindgust = windgusts[i];
       
-  Serial.println(windgust,5);
+  Serial.println(peakwindgust,5);
 }
 
 void WindSpeed()
@@ -347,72 +317,8 @@ void WindSpeed()
 
 void WindDirection()
 {
-  Serial.println(winddir,5);
-}
-//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-
-void loop()
-{
-  //Keep track of which minute it is
-  if(millis() - lastSecond >= MSECS_TO_SEC)
-  {
-    digitalWrite(STAT1, HIGH); //Blink stat LED
-
-    lastSecond += MSECS_TO_SEC;
-
-    // Calculate all weather readings
-    calcWeather();
-
-    digitalWrite(STAT1, LOW); //Turn off stat LED
-  }
-}
-
-//Calculates each of the variables that wunderground is expecting
-void calcWeather()
-{
-  //Calc humidity
-  humidity = myHumidity.readHumidity();
-
-  //Calc pressure
-  pressure = myPressure.readPressure();
-
-  // Calc rain
-  calc_rain();
-
-  //Calc light level
-  light_lvl = get_light_level();
-
-  // Calc Temp
-  // Ambient from humidity sensor
-  hTempc = myHumidity.readTemperature();
-  // Ambient from pressure sensor
-  pTempc = myPressure.readTemp();
-  // Ambient and sky temp from IR sensor
-  if (myIRSkyTemp.read()) // Read from the sensor
-  { // If the read is successful:
-    float irTempc = myIRSkyTemp.ambient(); // Get updated ambient temperature
-    float irSkyTempc = myIRSkyTemp.object(); // Get updated object temperature
-  }
-
-    // Calc Wind
-  calc_wind();
-}
-
-void calc_rain()
-{
-  if(++seconds >= SECS_TO_MIN)
-  {
-    seconds = 0;
-    if(++minutes >= MINS_TO_HOUR) minutes = 0;
-    rainHour[minutes] = 0; //Zero out this minute's rainfall amount
-  }
-}
-
-void calc_wind()
-{
-  // Wind Direction
-
+  int winddir;
+  
   unsigned int adc;
 
   adc = analogRead(WDIR); // get the current reading from the sensor
@@ -438,6 +344,45 @@ void calc_wind()
   if (adc < 940) winddir = 293;
   if (adc < 967) winddir = 315;
   if (adc < 990) winddir = 270;
+  
+  Serial.println(winddir,5);
+}
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+void loop()
+{
+  //Keep track of which minute it is
+  if(millis() - lastSecond >= MSECS_TO_SEC)
+  {
+    digitalWrite(STAT1, HIGH); //Blink stat LED
+
+    lastSecond += MSECS_TO_SEC;
+
+    // Calculate all weather readings
+    // Calc rain
+    calc_rain();
+
+    // Calc Wind
+    calc_wind();
+
+    digitalWrite(STAT1, LOW); //Turn off stat LED
+  }
+}
+
+void calc_rain()
+{
+  if(++seconds >= SECS_TO_MIN)
+  {
+    seconds = 0;
+    if(++minutes >= MINS_TO_HOUR) minutes = 0;
+    rainHour[minutes] = 0; //Zero out this minute's rainfall amount
+  }
+}
+
+void calc_wind()
+{
+
 
   // WindSpeed
   // Interrupt adds up the clicks. Each click is 1.492MPH of additional speed
@@ -451,16 +396,25 @@ void calc_wind()
   windClicks = 0; //Reset and start watching for new wind
 
   windspeed *= SPEED_PER_WINDCLICK; //4 * 1.492 = 5.968MPH
-  windspeed *= MPH_TO_MS; // Convert to m/s
 
-  // To calculate windgust we keep a 2 minute rolling history of instantaneous windspeed
+  // To calculate windgust we keep a 2 minute rolling history of instantaneous wingusts
   // Ascom needs 3 second gust over 2 minutes
 
-  windspeed_hist[windspeed_hist_secs] = windspeed;
-  if (++windspeed_hist_secs > (WINDGUST_PERIOD - 1))
-    windspeed_hist_secs = 0;
-  //zero out this seconds windspeed history  
-  windspeed_hist[windspeed_hist_secs] = 0;  
+  // Figure out the average windspeed over the last 3 seconds
+  // Current is available from above calculations
+  // Pas two are in the array windgust_calc
+  windgusts[windgusts_index] = windspeed;
+  for (int i = 0; i < WINDGUST_AVG_PERIOD - 1; i++)
+    windgusts[windgusts_index] += windgust_calc[i];
+
+  windgusts[windgusts_index] /= WINDGUST_AVG_PERIOD;
+  
+  // Store this in an array that covers 2 minutes
+  windgust_calc[windgust_calc_index] = windspeed;
+
+  // Increment the indices on a rolling dial basis
+  windgust_calc_index = (windgust_calc_index + 1) % (WINDGUST_AVG_PERIOD - 1);
+  windgusts_index = (windgusts_index + 1) % WINDGUST_MAX_PERIOD;
 }
 
 //Returns the voltage of the light sensor based on the 3.3V rail
@@ -495,8 +449,28 @@ void printWeather()
   Serial.print("SkyTemperature: ");
   SkyTemperature();
 
-  Serial.print("Temperature: ");
-  Temperature();
+  // Calc Temp
+  Serial.println("Temp Readings:");
+  // Ambient from humidity sensor
+  Serial.print("\tHumidity Sensor: ");
+  Serial.println(myHumidity.readTemperature(),5);
+  // Ambient from pressure sensor
+  Serial.print("\tPressure Sensor: ");
+  Serial.println(myPressure.readTemp(),5);
+  // Ambient from IR sensor
+  Serial.print("\tIR Sensor: ");
+  if (myIRSkyTemp.read()) // Read from the sensor
+  { 
+    // If the read is successful:
+    // Get updated ambient temperature
+    Serial.println(myIRSkyTemp.ambient()); 
+  } else 
+  {
+    Serial.println("");
+  }
+
+//  Serial.print("Temperature: ");
+//  Temperature();
 
   Serial.print("WindGust: ");
   WindGust();
