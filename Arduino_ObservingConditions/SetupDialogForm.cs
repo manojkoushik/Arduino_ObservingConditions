@@ -26,6 +26,21 @@ namespace ASCOM.Arduino
             // Update the state variables with results from the dialogue
             ObservingConditions.comPort = (string)comboBoxComPort.SelectedItem;
             ObservingConditions.tl.Enabled = chkTrace.Checked;
+            ObservingConditions.updateInterval = (int)numericUpDown1.Value;
+
+            ObservingConditions.cloudSlope = (float.Parse(textBox1.Text) - float.Parse(textBox2.Text)) / 100;
+            ObservingConditions.cloudyCond = int.Parse(textBox6.Text);
+            ObservingConditions.veryCloudyCond = int.Parse(textBox5.Text);
+
+            ObservingConditions.lightSlope = (float.Parse(textBox9.Text) - float.Parse(textBox10.Text)) / (float.Parse(textBox3.Text) - float.Parse(textBox4.Text));
+
+            ObservingConditions.windyCond = float.Parse(textBox8.Text);
+            ObservingConditions.veryWindyCond = float.Parse(textBox7.Text);
+
+            ObservingConditions.lightCond = float.Parse(textBox11.Text) * ObservingConditions.lightSlope;
+            ObservingConditions.veryLightCond = float.Parse(textBox12.Text) * ObservingConditions.lightSlope;
+
+            ObservingConditions.bwf = textBox13.Text;
         }
 
         private void cmdCancel_Click(object sender, EventArgs e) // Cancel button event handler
@@ -61,6 +76,13 @@ namespace ASCOM.Arduino
             {
                 comboBoxComPort.SelectedItem = ObservingConditions.comPort;
             }
+        }
+
+        private void textBox13_Clicked(object sender, EventArgs e)
+        {
+            DialogResult result = folderBrowserDialog1.ShowDialog();
+            if (result == DialogResult.OK)
+                textBox13.Text = folderBrowserDialog1.SelectedPath + "\\ArdinoBWF.txt";
         }
     }
 }

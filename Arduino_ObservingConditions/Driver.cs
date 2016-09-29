@@ -29,6 +29,8 @@ using ASCOM.Utilities;
 using ASCOM.DeviceInterface;
 using System.Globalization;
 using System.Collections;
+using System.Threading;
+using System.IO;
 
 namespace ASCOM.Arduino
 {
@@ -65,9 +67,38 @@ namespace ASCOM.Arduino
 
         internal static int RECEIVE_TIMEOUT = 3;
 
-        internal static string comPort; // Variables to hold the currrent device configuration
+        // Variables to hold the currrent device configuration
+        internal static string comPort;
+        internal static int updateInterval;
+        internal static float cloudSlope;
+        internal static int cloudyCond;
+        internal static int veryCloudyCond;
+        internal static float lightSlope;
+        internal static float windyCond;
+        internal static float veryWindyCond;
+        internal static float lightCond;
+        internal static float veryLightCond;
+        internal static string bwf;
 
         private Serial arduino;
+
+        // Variables to hold all the weather measurements. This is updated from the worker thread every so often
+        // and also dumped into the boltwood file. 
+        // The individual methods only return these variables and don't query Arduino
+        double cloudCover = 0;
+        double dewPoint = 0;
+        double humidity = 0;
+        double pressure = 0;
+        double rainRate = 0;
+        double skyBrightness = 0;
+        double skyTemperature = 0;
+        double temperature = 0;
+        double windSpeed = 0;
+        double windDirection = 0;
+        double windGust = 0;
+        DateTime lastRainIncident;
+
+        private Thread arduinoThread;
 
         /// <summary>
         /// Private variable to hold the connected state
@@ -103,7 +134,8 @@ namespace ASCOM.Arduino
             connectedState = false; // Initialise connected to false
             utilities = new Util(); //Initialise util object
             astroUtilities = new AstroUtils(); // Initialise astro utilities object
-            //TODO: Implement your additional construction here
+
+            arduinoThread = new Thread(this.boltWoodFile);
 
             tl.LogMessage("ObservingConditions", "Completed initialisation");
         }
@@ -178,10 +210,10 @@ namespace ASCOM.Arduino
             {
                 if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("HumidityValue", false);
+                    return CommandString("HumidityValue", false);
                 } else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("HumidityDesciption", false);
+                    return CommandString("HumidityDesciption", false);
                 }
                 else
                 {
@@ -191,11 +223,11 @@ namespace ASCOM.Arduino
             {
                 if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("PressureValue", false);
+                    return CommandString("PressureValue", false);
                 }
                 else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("PressureDesciption", false);
+                    return CommandString("PressureDesciption", false);
                 }
                 else
                 {
@@ -206,11 +238,11 @@ namespace ASCOM.Arduino
             {
                 if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("SkyBrightnessValue", false);
+                    return CommandString("SkyBrightnessValue", false);
                 }
                 else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("SkyBrightnessDesciption", false);
+                    return CommandString("SkyBrightnessDesciption", false);
                 }
                 else
                 {
@@ -221,11 +253,11 @@ namespace ASCOM.Arduino
             {
                 if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("TemperatureValue", false);
+                    return CommandString("TemperatureValue", false);
                 }
                 else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("TemperatureDesciption", false);
+                    return CommandString("TemperatureDesciption", false);
                 }
                 else
                 {
@@ -236,11 +268,11 @@ namespace ASCOM.Arduino
             {
                 if (actionParameters.Equals("Value", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("SkyTemperatureValue", false);
+                    return CommandString("SkyTemperatureValue", false);
                 }
                 else if (actionParameters.Equals("Description", StringComparison.OrdinalIgnoreCase))
                 {
-                    CommandString("SkyTemperatureDesciption", false);
+                    return CommandString("SkyTemperatureDesciption", false);
                 }
                 else
                 {
@@ -253,6 +285,184 @@ namespace ASCOM.Arduino
             }
         }
 
+        public void boltWoodFile()
+        {
+            DateTime timeStamp = DateTime.Now;
+
+            while (true)
+            {
+                DateTime lastUpdate = timeStamp;
+                
+                LogMessage("BoltWoodFile", "get TimeStamp");
+                timeStamp = DateTime.Now;
+
+                LogMessage("BoltWoodFile", "get Humidity");
+                humidity = double.Parse(CommandString("Humidity", false));
+
+                LogMessage("BoltWoodFile", "get Pressure");
+                pressure = double.Parse(CommandString("Pressure", false));
+                // Pressure comes in from sensor as kPa. We need to convert to hPa
+                pressure *= 10;
+
+                LogMessage("BoltWoodFile", "get Temperature");
+                temperature = double.Parse(CommandString("Temperature", false));
+
+                LogMessage("BoltWoodFile", "get SkyTemperature");
+                skyTemperature = double.Parse(CommandString("SkyTemperature", false));
+
+                // This property can be interpreted as 0.0 = Dry any positive nonzero value = wet.
+                // Rainfall intensity is classified according to the rate of precipitation:
+                // Light rain — when the precipitation rate is < 2.5 mm (0.098 in) per hour
+                // Moderate rain — when the precipitation rate is between 2.5 mm (0.098 in) - 7.6 mm (0.30 in) or 10 mm (0.39 in) per hour
+                // Heavy rain — when the precipitation rate is > 7.6 mm (0.30 in) per hour, or between 10 mm (0.39 in) and 50 mm (2.0 in) per hour
+                // Violent rain — when the precipitation rate is > 50 mm (2.0 in) per hour
+                LogMessage("BoltWoodFile", "get RainRate");
+                rainRate = double.Parse(CommandString("RainRate", false));
+                // Sensor reports inches/hour. We need to convert to mm/hour
+                rainRate *= 25.4;
+                if (rainRate > 0)
+                    lastRainIncident = DateTime.Now;
+
+                LogMessage("BoltWoodFile", "get WindSpeed");
+                windSpeed = double.Parse(CommandString("WindSpeed", false));
+                // Sensor reports MPH. We need to convert to m/s
+                windSpeed *= 0.44704;
+
+                LogMessage("BoltWoodFile", "get WindGust");
+                windGust = double.Parse(CommandString("WindGust", false));
+                // Sensor reports MPH. We need to convert to m/s
+                windGust *= 0.44704;
+
+                LogMessage("BoltWoodFile", "get WindDirection");
+                windDirection = double.Parse(CommandString("WindDirection", false));
+
+                // Sky brightness (Ascom needs Lux, but arduino is returning voltage. Calibration settings are used to convert
+                // 0.0001 lux  Moonless, overcast night sky (starlight)
+                // 0.002 lux Moonless clear night sky with airglow
+                // 0.27–1.0 lux  Full moon on a clear night
+                // 3.4 lux Dark limit of civil twilight under a clear sky
+                // 50 lux  Family living room lights (Australia, 1998)
+                // 80 lux  Office building hallway/toilet lighting
+                // 100 lux Very dark overcast day
+                // 320–500 lux Office lighting
+                // 400 lux Sunrise or sunset on a clear day.
+                // 1000 lux  Overcast day; typical TV studio lighting
+                // 10000–25000 lux Full daylight (not direct sun)
+                // 32000–100000 lux  Direct sunlight
+                LogMessage("BoltWoodFile", "get SkyBrightness");
+                skyBrightness = lightSlope * double.Parse(CommandString("SkyBrightness", false));
+
+                LogMessage("BoltWoodFile", "calc CloudCover");
+                cloudCover = cloudSlope * (temperature - skyTemperature);
+
+                LogMessage("BoltWoodFile", "calc DewPoint");
+                dewPoint = 243.04 * (Math.Log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - Math.Log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
+
+                // Date       Time        T V SkyT  AmbT SenT Wind Hum DewPt Hea
+                // 2005-06-03 02:07:23.34 C K -28.5 18.7 22.5 45.3 75  10.3  3
+                // R W Since Now()        c w r d C A
+                // 0 0 00004 038506.08846 1 2 1 0 0 0
+                // The fields mean:
+                // Heading Col’s Meaning
+                // Date    1-10  local date yyyy - mm - dd
+                // Time    12-22 local time hh: mm: ss.ss(24 hour clock)
+                // T       24    temperature units displayed and in this data, 'C' for Celsius or 'F' for Fahrenheit
+                // V       26    wind velocity units displayed and in this data, ‘K’ for km / hr or ‘M’ for mph or'm' for m/s
+                // SkyT    28-33 sky - ambient temperature, 999. for saturated hot, -999. for saturated cold, or –998. for wet
+                // AmbT    35-40 ambient temperature
+                // SenT    41-47 sensor case temperature, 999. for saturated hot, -999. for saturated cold. Neither
+                //               saturated condition should ever occur.
+                // Wind    49-54 wind speed or:
+                //               -1. if still heating up,
+                //               -2. if wet,
+                //               -3. if the A / D from the wind probe is bad (firmware < V56 only) ,
+                //               -4. if the probe is not heating(a failure condition),
+                //               -5. if the A / D from the wind probe is low (shorted, a failure condition),
+                //               -6. if the A / D from the wind probe is high (no probe plugged in or a failure)
+                // Hum     56-58 relative humidity in %
+                // DewPt   60-65 dew point temperature
+                // Hea     67-69 heater setting in %
+                // R       71    rain flag, = 0 for dry, = 1 for rain in the last minute, = 2 for rain right now
+                // W       73    wet flag, = 0 for dry, = 1 for wet in the last minute, = 2 for wet right now
+                // Since   75-79 seconds since the last valid data
+                // Now()   81-92 date/time given as the VB6 Now() function result (in days) when Clarity II last
+                //                wrote this file
+                // c       94    cloud condition(see the Cloudcond enum in section 20) 
+                // w       96    wind condition (see the Windcond enum in section 20)
+                // r       98    rain condition(see the Raincond enum in section 20)
+                // d       100   daylight condition(see the Daycond enum in section 20)
+                // C       102   roof close, = 0 not requested, = 1 if roof close was requested on this cycle
+                // A       104   alert, = 0 when not alerting, = 1 when alerting
+
+                //Date and Time
+                string boltwoodLine = timeStamp.ToString("yyyy-MM-dd HH:mm:ss.ff")
+                    // Temperature and velocity units
+                    + " C m "
+                    // skyTemperature
+                    + skyTemperature.ToString("000.00;-00.00;000.00") + " "
+                    // ambient temperature
+                    + temperature.ToString("000.00;-00.00;000.00") + " "
+                    // case temperature
+                    + "        "
+                    // wind speed
+                    + windSpeed.ToString("000.00;-00.00;000.00") + " "
+                    // humidity
+                    + humidity.ToString("000") + " "
+                    // dewpoint
+                    + dewPoint.ToString("000.00;-00.00;000.00") + " "
+                    // heater setting
+                    + "    ";
+
+                string rainFlag = "1";
+                TimeSpan lastRain = DateTime.Now - lastRainIncident;
+                if (lastRain.TotalMinutes <= 2)
+                    rainFlag = "2";
+                if (rainRate > 0)
+                    rainFlag = "3";
+
+                // RainFlag
+                boltwoodLine += rainFlag + " "
+                    // Dry Flag
+                    + rainFlag + " ";
+
+                // time since last update
+                TimeSpan t = timeStamp - lastUpdate;
+                boltwoodLine += t.TotalSeconds.ToString("00000") + " "
+                    // Now() in days. Leaving blank
+                    + "             ";
+
+                string cloudFlag = "1";
+                if (cloudCover > cloudyCond)
+                    cloudFlag = "2";
+                if (cloudCover > veryCloudyCond)
+                    cloudFlag = "3";
+
+                string windFlag = "1";
+                if (windSpeed > windyCond)
+                    windFlag = "2";
+                if (windSpeed > veryWindyCond)
+                    windFlag = "3";
+
+                string lightFlag = "1";
+                if (skyBrightness > lightCond)
+                    lightFlag = "2";
+                if (skyBrightness > veryLightCond)
+                    lightFlag = "3";
+
+                // various flags
+                boltwoodLine += cloudFlag + " " + windFlag + " " + rainFlag + " " + lightFlag;
+
+                // roof close and alert
+                boltwoodLine += "    ";
+               
+                using (StreamWriter s = File.Create(bwf))
+                {
+                    s.WriteLine(boltwoodLine);
+                }
+
+                Thread.Sleep(updateInterval * 1000);
+            }
+        }
 
         public void CommandBlind(string command, bool raw)
         {
@@ -310,6 +520,7 @@ namespace ASCOM.Arduino
                         arduino.PortName = comPort;
                         arduino.Speed = SerialSpeed.ps9600;
                         arduino.Connected = true;
+                        arduinoThread.Start();
                                                
                     }
                     catch (Exception e)
@@ -323,7 +534,7 @@ namespace ASCOM.Arduino
                 {
                     LogMessage("Connected Unset", "Disconnecting to port {0}", comPort);
 
-                    if (arduino && arduino.Connected)
+                    if (arduino !=null && arduino.Connected)
                         arduino.Connected = false;
                     connectedState = false;
                 }
@@ -418,8 +629,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("CloudCover", "get - not implemented");
-                throw new PropertyNotImplementedException("CloudCover", false);
+                LogMessage("CloudCover", "get");
+                return cloudCover;
             }
         }
 
@@ -434,8 +645,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("DewPoint", "get - not implemented");
-                throw new PropertyNotImplementedException("DewPoint", false);
+                LogMessage("DewPoint", "get");
+                return dewPoint;
             }
         }
 
@@ -451,7 +662,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("Humidity", "get");
-                return double.Parse(CommandString("Humidity", false));
+                return humidity;
             }
         }
 
@@ -468,7 +679,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("Pressure", "get");
-                return double.Parse(CommandString("Pressure", false));
+                return pressure;
             }
         }
 
@@ -484,7 +695,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("RainRate", "get");
-                return double.Parse(CommandString("RainRate", false));
+                return rainRate;
             }
         }
 
@@ -514,13 +725,23 @@ namespace ASCOM.Arduino
                     return "Average period in hours, immediate values are only available";
                 case "dewpoint":
                 case "humidity":
+                    LogMessage("SensorDescription", "{0}", PropertyName);
+                    return CommandString("HumidityDescription", false);
+                case "temperature":
+                    LogMessage("SensorDescription", "{0}", PropertyName);
+                    return CommandString("TemperatureDescription", false);
+                case "skytemperature":
+                    LogMessage("SensorDescription", "{0}", PropertyName);
+                    return CommandString("SkyTemperatureDescription", false);
                 case "pressure":
-                case "rainrate":
+                    LogMessage("SensorDescription", "{0}", PropertyName);
+                    return CommandString("PressureDescription", false);
                 case "skybrightness":
+                    LogMessage("SensorDescription", "{0}", PropertyName);
+                    return CommandString("SkyBrightnessDescription", false);
+                case "rainrate":
                 case "skyquality":
                 case "starfwhm":
-                case "skytemperature":
-                case "temperature":
                 case "winddirection":
                 case "windgust":
                 case "windspeed":
@@ -539,8 +760,8 @@ namespace ASCOM.Arduino
         {
             get
             {
-                LogMessage("SkyBrightness", "get - not implemented");
-                throw new PropertyNotImplementedException("SkyBrightness", false);
+                LogMessage("SkyBrightness", "get");
+                return skyBrightness;
             }
         }
 
@@ -576,7 +797,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("SkyTemperature", "get");
-                return double.Parse(CommandString("SkyTemperature", false));
+                return skyTemperature;
             }
         }
 
@@ -588,7 +809,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("Temperature", "get");
-                return double.Parse(CommandString("Temperature", false));
+                return temperature;
             }
         }
 
@@ -648,7 +869,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("WindDirection", "get");
-                return double.Parse(CommandString("WindDirection", false));
+                return windDirection;
             }
         }
 
@@ -660,7 +881,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("WindGust", "get");
-                return double.Parse(CommandString("WindGust", false));
+                return windGust;
             }
         }
 
@@ -672,7 +893,7 @@ namespace ASCOM.Arduino
             get
             {
                 LogMessage("WindSpeed", "get");
-                return double.Parse(CommandString("WindSpeed", false));
+                return windSpeed;
             }
         }
 
