@@ -155,6 +155,8 @@ void setup()
   myIRSkyTemp.begin(); // Initialize I2C library and the MLX90614
   myIRSkyTemp.setUnit(TEMP_C); // Set units to Farenheit (alternatively TEMP_C or TEMP_K)
 
+  // Add all command to support Ascom
+  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
   myDeviceCmd.addCommand("Humidity", Humidity); // Atmospheric humidity (%)
   myDeviceCmd.addCommand("Pressure", Pressure); // Atmospheric presure at the observatory (Ascom needs hPa)
                                        // This must be the pressure at the observatory altitude and not the adjusted pressure at sea level. 
@@ -186,7 +188,28 @@ void setup()
                                                  // where East=90.0, South=180.0, West=270.0 and North=360.0
   myDeviceCmd.addCommand("WindGust", WindGust); // Wind gust (Ascom needs m/s) Peak 3 second wind speed over the last 2 minutes
   myDeviceCmd.addCommand("WindSpeed", WindSpeed); // Wind speed (Ascom needs m/s)
+  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+
+  // Add commands for Action property of Ascom Driver
+  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+  // Support for Value
+  myDeviceCmd.addCommand("HumidityValue", HumidityValue);
+  myDeviceCmd.addCommand("PressureValue", PressureValue);
+  myDeviceCmd.addCommand("SkyTemperatureValue", SkyTemperatureValue);
+  myDeviceCmd.addCommand("TemperatureValue", TemperatureValue);
+  myDeviceCmd.addCommand("SkyBrightnessValue", SkyBrightnessValue);
+
+  // Support for Description
+  myDeviceCmd.addCommand("HumidityDescription", HumidityDescription);
+  myDeviceCmd.addCommand("PressureDescription", PressureDescription);
+  myDeviceCmd.addCommand("SkyTemperatureDescription", SkyTemperatureDescription);
+  myDeviceCmd.addCommand("TemperatureDescription", TemperatureDescription);
+  myDeviceCmd.addCommand("SkyBrightnessDescription", SkyBrightnessDescription);
+  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
+  // Support for debugging
   myDeviceCmd.addCommand("WeatherDebug", printWeather); // Used to debug and print out all weather parameters
 
   // Zero out the arrays
@@ -203,6 +226,64 @@ void setup()
   // Debug
   Serial.println("Observatory Weather Station online!");  
 }
+
+// Commands for Action property of Ascom Driver
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+void HumidityValue()
+{
+  Humidity();
+}
+
+void HumidityDescription()
+{
+  Serial.println("HTU21D");
+}
+
+void PressureValue()
+{
+  Pressure();
+}
+
+void PressureDescription()
+{
+  Serial.println("MPL3115A2");
+}
+
+void SkyTemperatureValue()
+{
+  SkyTemperature();
+}
+
+void SkyTemperatureDescription()
+{
+  Serial.println("MLX90614");
+}
+
+void TemperatureValue()
+{
+  Temperature();
+}
+
+void TemperatureDescription()
+{
+  Serial.println("MLX90614");
+}
+
+void SkyBrightnessValue()
+{
+  SkyBrightness();
+}
+
+void SkyBrightnessDescription()
+{
+  Serial.println("ALS-PT19");
+}
+
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+// Ascom command handlers
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 void Humidity()
 {
@@ -240,11 +321,6 @@ void Temperature()
   Serial.println(irTempc,5);
 }
 
-void WindSpeed()
-{
-  Serial.println(windspeed,5);
-}
-
 void WindGust()
 {
   float peakwindgust = 0;
@@ -264,10 +340,17 @@ void WindGust()
   Serial.println(windgust,5);
 }
 
+void WindSpeed()
+{
+  Serial.println(windspeed,5);
+}
+
 void WindDirection()
 {
   Serial.println(winddir,5);
 }
+//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
 
 void loop()
 {
@@ -397,4 +480,30 @@ float get_light_level()
 
 void printWeather()
 {
+  Serial.print("Humidity: ");
+  Humidity();
+
+  Serial.print("Pressure: ");
+  Pressure();
+
+  Serial.print("RainRate: ");
+  RainRate();
+
+  Serial.print("SkyBrightness: ");
+  SkyBrightness();
+
+  Serial.print("SkyTemperature: ");
+  SkyTemperature();
+
+  Serial.print("Temperature: ");
+  Temperature();
+
+  Serial.print("WindGust: ");
+  WindGust();
+
+  Serial.print("WindSpeed: ");
+  WindSpeed();
+
+  Serial.print("WindDirection: ");
+  WindDirection();
 }
