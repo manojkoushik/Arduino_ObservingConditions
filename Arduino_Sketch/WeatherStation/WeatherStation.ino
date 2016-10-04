@@ -139,22 +139,22 @@ void setup()
   attachInterrupt(0, rainIRQ, FALLING);
   attachInterrupt(1, wspeedIRQ, FALLING);
 
-  myIRSkyTemp.begin(); // Initialize I2C library and the MLX90614
+  myIRSkyTemp.begin(MLX90614_DEFAULT_ADDRESS); // Initialize I2C library and the MLX90614
   myIRSkyTemp.setUnit(TEMP_C); // Set units to Centigrade (alternatively TEMP_C or TEMP_K)
 
   // Add all command to support Ascom
   //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  myDeviceCmd.addCommand("Humidity", Humidity); // Atmospheric humidity (%)
-  myDeviceCmd.addCommand("Pressure", Pressure); // Atmospheric presure at the observatory (Ascom needs hPa)
+  myDeviceCmd.addCommand("H", Humidity); // Atmospheric humidity (%)
+  myDeviceCmd.addCommand("P", Pressure); // Atmospheric presure at the observatory (Ascom needs hPa)
                                        // This must be the pressure at the observatory altitude and not the adjusted pressure at sea level. 
-  myDeviceCmd.addCommand("RainRate", RainRate); // Rain rate (Ascom needs mm/hour)
+  myDeviceCmd.addCommand("RR", RainRate); // Rain rate (Ascom needs mm/hour)
                                        // This property can be interpreted as 0.0 = Dry any positive nonzero value = wet.
                                        //   Rainfall intensity is classified according to the rate of precipitation:
                                        //   Light rain — when the precipitation rate is < 2.5 mm (0.098 in) per hour
                                        //   Moderate rain — when the precipitation rate is between 2.5 mm (0.098 in) - 7.6 mm (0.30 in) or 10 mm (0.39 in) per hour
                                        //   Heavy rain — when the precipitation rate is > 7.6 mm (0.30 in) per hour, or between 10 mm (0.39 in) and 50 mm (2.0 in) per hour
                                        //   Violent rain — when the precipitation rate is > 50 mm (2.0 in) per hour
-  myDeviceCmd.addCommand("SkyBrightness", SkyBrightness); // Sky brightness (Ascom needs Lux, but we are returning voltage. Ascom driver will have to be calibrated)
+  myDeviceCmd.addCommand("SB", SkyBrightness); // Sky brightness (Ascom needs Lux, but we are returning voltage. Ascom driver will have to be calibrated)
                                                  // 0.0001 lux  Moonless, overcast night sky (starlight)
                                                  // 0.002 lux Moonless clear night sky with airglow
                                                  // 0.27–1.0 lux  Full moon on a clear night
@@ -167,37 +167,32 @@ void setup()
                                                  // 1000 lux  Overcast day; typical TV studio lighting
                                                  // 10000–25000 lux Full daylight (not direct sun)
                                                  // 32000–100000 lux  Direct sunlight
-  myDeviceCmd.addCommand("SkyTemperature", SkyTemperature); // Sky temperature in °C
-  myDeviceCmd.addCommand("Temperature", Temperature); // Temperature in °C
-  myDeviceCmd.addCommand("WindDirection", WindDirection); // Wind direction (degrees, 0..360.0) 
+  myDeviceCmd.addCommand("ST", SkyTemperature); // Sky temperature in °C
+  myDeviceCmd.addCommand("T", Temperature); // Temperature in °C
+  myDeviceCmd.addCommand("WD", WindDirection); // Wind direction (degrees, 0..360.0) 
                                                  // Value of 0.0 is returned when the wind speed is 0.0. 
                                                  // Wind direction is measured clockwise from north, through east, 
                                                  // where East=90.0, South=180.0, West=270.0 and North=360.0
-  myDeviceCmd.addCommand("WindGust", WindGust); // Wind gust (Ascom needs m/s) Peak 3 second wind speed over the last 2 minutes
-  myDeviceCmd.addCommand("WindSpeed", WindSpeed); // Wind speed (Ascom needs m/s)
+  myDeviceCmd.addCommand("WG", WindGust); // Wind gust (Ascom needs m/s) Peak 3 second wind speed over the last 2 minutes
+  myDeviceCmd.addCommand("WS", WindSpeed); // Wind speed (Ascom needs m/s)
   //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
   // Add commands for Action property of Ascom Driver
   //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // Support for Value
-  myDeviceCmd.addCommand("HumidityValue", Humidity);
-  myDeviceCmd.addCommand("PressureValue", Pressure);
-  myDeviceCmd.addCommand("SkyTemperatureValue", SkyTemperature);
-  myDeviceCmd.addCommand("TemperatureValue", Temperature);
-  myDeviceCmd.addCommand("SkyBrightnessValue", SkyBrightness);
+  // Values use the same as regular reads
 
   // Support for Description
-  myDeviceCmd.addCommand("HumidityDescription", HumidityDescription);
-  myDeviceCmd.addCommand("PressureDescription", PressureDescription);
-  myDeviceCmd.addCommand("SkyTemperatureDescription", SkyTemperatureDescription);
-  myDeviceCmd.addCommand("TemperatureDescription", TemperatureDescription);
-  myDeviceCmd.addCommand("SkyBrightnessDescription", SkyBrightnessDescription);
+  myDeviceCmd.addCommand("HD", HumidityDescription);
+  myDeviceCmd.addCommand("PD", PressureDescription);
+  myDeviceCmd.addCommand("STD", SkyTemperatureDescription);
+  myDeviceCmd.addCommand("TD", TemperatureDescription);
+  myDeviceCmd.addCommand("SBD", SkyBrightnessDescription);
   //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
   // Support for debugging
-  myDeviceCmd.addCommand("WeatherDebug", printWeather); // Used to debug and print out all weather parameters
+  myDeviceCmd.addCommand("PW", printWeather); // Used to debug and print out all weather parameters
 
   // Zero out the arrays
   int i;
@@ -303,6 +298,7 @@ void Temperature()
 void WindGust()
 {
   float peakwindgust = 0;
+
   for (int i = 0; i < WINDGUST_MAX_PERIOD; i++)
     if (windgusts[i] > peakwindgust)
       peakwindgust = windgusts[i];
@@ -355,7 +351,6 @@ void loop()
   //Keep track of which minute it is
   if(millis() - lastSecond >= MSECS_TO_SEC)
   {
-    digitalWrite(STAT1, HIGH); //Blink stat LED
 
     lastSecond += MSECS_TO_SEC;
 
@@ -366,8 +361,9 @@ void loop()
     // Calc Wind
     calc_wind();
 
-    digitalWrite(STAT1, LOW); //Turn off stat LED
   }
+  
+  myDeviceCmd.readSerial();
 }
 
 void calc_rain()
@@ -390,7 +386,7 @@ void calc_wind()
   float deltaTime = millis() - lastWindCheck; //750ms
   lastWindCheck = millis();
 
-  deltaTime /= MSECS_TO_SEC; //Covert to seconds
+  deltaTime /= MSECS_TO_SEC; //Convert to seconds
 
   windspeed = (float)windClicks / deltaTime; //3 / 0.750s = 4
   windClicks = 0; //Reset and start watching for new wind
@@ -409,7 +405,7 @@ void calc_wind()
 
   windgusts[windgusts_index] /= WINDGUST_AVG_PERIOD;
   
-  // Store this in an array that covers 2 minutes
+  // Store this windspeed in an array that covers 2 minutes
   windgust_calc[windgust_calc_index] = windspeed;
 
   // Increment the indices on a rolling dial basis
@@ -434,31 +430,31 @@ float get_light_level()
 
 void printWeather()
 {
-  Serial.print("Humidity: ");
+  Serial.print("H: ");
   Humidity();
 
-  Serial.print("Pressure: ");
+  Serial.print("P: ");
   Pressure();
 
-  Serial.print("RainRate: ");
+  Serial.print("RR: ");
   RainRate();
 
-  Serial.print("SkyBrightness: ");
+  Serial.print("SB: ");
   SkyBrightness();
 
-  Serial.print("SkyTemperature: ");
+  Serial.print("ST: ");
   SkyTemperature();
 
   // Calc Temp
-  Serial.println("Temp Readings:");
+  Serial.println("T:");
   // Ambient from humidity sensor
-  Serial.print("\tHumidity Sensor: ");
+  Serial.print("\tH: ");
   Serial.println(myHumidity.readTemperature(),5);
   // Ambient from pressure sensor
-  Serial.print("\tPressure Sensor: ");
+  Serial.print("\tP: ");
   Serial.println(myPressure.readTemp(),5);
   // Ambient from IR sensor
-  Serial.print("\tIR Sensor: ");
+  Serial.print("\tIR: ");
   if (myIRSkyTemp.read()) // Read from the sensor
   { 
     // If the read is successful:
@@ -472,12 +468,12 @@ void printWeather()
 //  Serial.print("Temperature: ");
 //  Temperature();
 
-  Serial.print("WindGust: ");
+  Serial.print("WG: ");
   WindGust();
 
-  Serial.print("WindSpeed: ");
+  Serial.print("WS: ");
   WindSpeed();
 
-  Serial.print("WindDirection: ");
+  Serial.print("WD: ");
   WindDirection();
 }
