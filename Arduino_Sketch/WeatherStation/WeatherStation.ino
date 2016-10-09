@@ -313,7 +313,7 @@ void WindSpeed()
 
 void WindDirection()
 {
-  int winddir;
+  unsigned int winddir;
   
   unsigned int adc;
 
@@ -322,26 +322,45 @@ void WindDirection()
   // The following table is ADC readings for the wind direction sensor output, sorted from low to high.
   // Each threshold is the midpoint between adjacent headings. The output is degrees for that ADC reading.
   // Note that these are not in compass degree order! See Weather Meters datasheet for more information.
+  //0,33k, 3.84v
+  //22.5, 6.57k, 1.98v
+  //45, 8.2k, 2.25v
+  //67.5, 891, 0.41v
+  //90, 1k, 0.45v
+  //112.5, 688, 0.32v
+  //135,2.2k, 0.90v
+  //157.5, 1.41k, 0.62v
+  //180 ,3.9k, 1.40v
+  //202.5, 3.14k, 1.19v
+  //225, 16k ,3.08v
+  //247.5, 14.12k, 2.93v
+  //270, 120k ,4.62v
+  //292.5, 42.12k, 4.04v
+  //315, 64.9k, 4.78v
+  //337.5, 21.88k, 3.43v
 
   winddir = -1;
-  if (adc < 380) winddir = 113;
-  if (adc < 393) winddir = 68;
-  if (adc < 414) winddir = 90;
-  if (adc < 456) winddir = 158;
-  if (adc < 508) winddir = 135;
-  if (adc < 551) winddir = 203;
-  if (adc < 615) winddir = 180;
-  if (adc < 680) winddir = 23;
-  if (adc < 746) winddir = 45;
-  if (adc < 801) winddir = 248;
-  if (adc < 833) winddir = 225;
-  if (adc < 878) winddir = 338;
-  if (adc < 913) winddir = 0;
-  if (adc < 940) winddir = 293;
-  if (adc < 967) winddir = 315;
   if (adc < 990) winddir = 270;
-  
-  Serial.println(winddir,5);
+  if (adc < 967) winddir = 315;
+  if (adc < 940) winddir = 293;
+  if (adc < 913) winddir = 0;
+  if (adc < 878) winddir = 338;
+  if (adc < 833) winddir = 225;
+  if (adc < 801) winddir = 248;
+  if (adc < 746) winddir = 45;
+  if (adc < 680) winddir = 23;
+  if (adc < 615) winddir = 180;
+  if (adc < 551) winddir = 203;
+  if (adc < 508) winddir = 135;
+  if (adc < 456) winddir = 158;
+  if (adc < 414) winddir = 90;
+  if (adc < 393) winddir = 68;
+  if (adc < 380) winddir = 113;
+
+  if(winddir > 180) winddir -= 180;
+  else winddir += 180;
+  if (windspeed = 0) winddir = 0;
+  Serial.println(winddir,DEC);
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -360,7 +379,6 @@ void loop()
 
     // Calc Wind
     calc_wind();
-
   }
   
   myDeviceCmd.readSerial();
