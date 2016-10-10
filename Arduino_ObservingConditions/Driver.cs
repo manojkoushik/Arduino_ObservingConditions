@@ -58,27 +58,77 @@ namespace ASCOM.Arduino
         /// <summary>
         /// Driver description that displays in the ASCOM Chooser.
         /// </summary>
-        private static string driverDescription = "ASCOM ObservingConditions Driver for Arduino.";
+        private static string driverDescription = "Arduino ObservingConditions";
 
-        internal static string comPortProfileName = "COM Port"; // Constants used for Profile persistence
+        // Variables to hold the currrent device configuration
+        internal static string comPortProfileName = "COM Port"; // COM Port
         internal static string comPortDefault = "COM1";
-        internal static string traceStateProfileName = "Trace Level";
+        internal static string comPort;
+
+        internal static string traceStateProfileName = "Trace Level"; // Trace Level
         internal static string traceStateDefault = "false";
 
         internal static int RECEIVE_TIMEOUT = 3;
 
-        // Variables to hold the currrent device configuration
-        internal static string comPort;
+        internal static string updateIntervalProfileName = "updateInterval"; // How often should we update sensors?
+        internal static int updateIntervalDefault = 30;
         internal static int updateInterval;
-        internal static float cloudSlope;
+
+        internal static string clearSkiesProfileName = "clearSkies"; // When is it clear?
+        internal static float clearSkiesDefault = 60;
+        internal static float clearSkies;
+
+        internal static string cloudySkiesProfileName = "cloudySkiese"; // when is it cloudy?
+        internal static float cloudySkiesDefault = 20;
+        internal static float cloudySkies;
+
+        internal static string cloudyCondProfileName = "cloudyCond"; // What defines a Cloudy Condition?
+        internal static int cloudyCondDefault = 30;
         internal static int cloudyCond;
+
+        internal static string veryCloudyCondProfileName = "veryCloudyCond"; // What defines a Very Cloudy Condition?
+        internal static int veryCloudyCondDefault = 80;
         internal static int veryCloudyCond;
-        internal static float lightSlope;
+
+        internal static float nightVol;
+        internal static string nightVolProfileName = "nightVoltage"; // when is it dark?
+        internal static float nightVolDefault = 0;
+
+        internal static float dayVol;
+        internal static string dayVolProfileName = "dayVoltage"; // when is it day?
+        internal static float dayVolDefault = 4;
+
+        internal static int nightLux;
+        internal static string nightLuxProfileName = "nightLux"; // when is it dark?
+        internal static int nightLuxDefault = 0;
+
+        internal static int dayLux;
+        internal static string dayLuxProfileName = "dayLux"; // when is it day?
+        internal static int dayLuxDefault = 25000;
+
+        internal static int twilightCond;
+        internal static string twilightCondProfileName = "twilightCond"; // what defines a light condition
+        internal static int twilightCondDefault = 1;
+
+        internal static int daylightCond;
+        internal static string daylightCondProfileName = "daylightCond"; // what defines a very light condition
+        internal static int daylightCondDefault = 3;
+
         internal static float windyCond;
+        internal static string windyCondProfileName = "windyCond"; // What defines a windy condition
+        internal static float windyCondDefault = 5;
+
         internal static float veryWindyCond;
-        internal static float lightCond;
-        internal static float veryLightCond;
+        internal static string veryWindyCondProfileName = "veryWindyCond"; // what defines a very windy condition
+        internal static float veryWindyCondDefault = 20;
+
         internal static string bwf;
+        internal static string bwfProfileName = "bwf"; // Default boltwood file location
+        internal static string bwfDefault = "C:/ArduinoBWF.txt";
+
+        internal static bool bwfEnabled;
+        internal static string bwfEnabledProfileName = "bwfEnabled"; // Default boltwood file location
+        internal static bool bwfEnabledDefault = true;
 
         private Serial arduino;
 
@@ -297,18 +347,18 @@ namespace ASCOM.Arduino
                 timeStamp = DateTime.Now;
 
                 LogMessage("BoltWoodFile", "get Humidity");
-                humidity = double.Parse(CommandString("Humidity", false));
+                humidity = double.Parse(CommandString("H", false));
 
                 LogMessage("BoltWoodFile", "get Pressure");
-                pressure = double.Parse(CommandString("Pressure", false));
+                pressure = double.Parse(CommandString("P", false));
                 // Pressure comes in from sensor as kPa. We need to convert to hPa
                 pressure *= 10;
 
                 LogMessage("BoltWoodFile", "get Temperature");
-                temperature = double.Parse(CommandString("Temperature", false));
+                temperature = double.Parse(CommandString("T", false));
 
                 LogMessage("BoltWoodFile", "get SkyTemperature");
-                skyTemperature = double.Parse(CommandString("SkyTemperature", false));
+                skyTemperature = double.Parse(CommandString("ST", false));
 
                 // This property can be interpreted as 0.0 = Dry any positive nonzero value = wet.
                 // Rainfall intensity is classified according to the rate of precipitation:
@@ -317,24 +367,24 @@ namespace ASCOM.Arduino
                 // Heavy rain — when the precipitation rate is > 7.6 mm (0.30 in) per hour, or between 10 mm (0.39 in) and 50 mm (2.0 in) per hour
                 // Violent rain — when the precipitation rate is > 50 mm (2.0 in) per hour
                 LogMessage("BoltWoodFile", "get RainRate");
-                rainRate = double.Parse(CommandString("RainRate", false));
+                rainRate = double.Parse(CommandString("RR", false));
                 // Sensor reports inches/hour. We need to convert to mm/hour
                 rainRate *= 25.4;
                 if (rainRate > 0)
                     lastRainIncident = DateTime.Now;
 
                 LogMessage("BoltWoodFile", "get WindSpeed");
-                windSpeed = double.Parse(CommandString("WindSpeed", false));
+                windSpeed = double.Parse(CommandString("WS", false));
                 // Sensor reports MPH. We need to convert to m/s
                 windSpeed *= 0.44704;
 
                 LogMessage("BoltWoodFile", "get WindGust");
-                windGust = double.Parse(CommandString("WindGust", false));
+                windGust = double.Parse(CommandString("WG", false));
                 // Sensor reports MPH. We need to convert to m/s
                 windGust *= 0.44704;
 
                 LogMessage("BoltWoodFile", "get WindDirection");
-                windDirection = double.Parse(CommandString("WindDirection", false));
+                windDirection = double.Parse(CommandString("WD", false));
 
                 // Sky brightness (Ascom needs Lux, but arduino is returning voltage. Calibration settings are used to convert
                 // 0.0001 lux  Moonless, overcast night sky (starlight)
@@ -350,10 +400,13 @@ namespace ASCOM.Arduino
                 // 10000–25000 lux Full daylight (not direct sun)
                 // 32000–100000 lux  Direct sunlight
                 LogMessage("BoltWoodFile", "get SkyBrightness");
-                skyBrightness = lightSlope * double.Parse(CommandString("SkyBrightness", false));
+                float lightSlope = (dayLux - nightLux) / (dayVol - nightVol);
+                skyBrightness = (int)(lightSlope * double.Parse(CommandString("SB", false)));
 
                 LogMessage("BoltWoodFile", "calc CloudCover");
-                cloudCover = cloudSlope * (temperature - skyTemperature);
+                float cloudSlope = (0-100)/(clearSkies - cloudySkies);
+                float cloudIntercept = 100 - (clearSkies * cloudSlope);
+                cloudCover = cloudIntercept + (cloudSlope * (temperature - skyTemperature));
 
                 LogMessage("BoltWoodFile", "calc DewPoint");
                 dewPoint = 243.04 * (Math.Log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - Math.Log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
@@ -395,69 +448,73 @@ namespace ASCOM.Arduino
                 // A       104   alert, = 0 when not alerting, = 1 when alerting
 
                 //Date and Time
-                string boltwoodLine = timeStamp.ToString("yyyy-MM-dd HH:mm:ss.ff")
-                    // Temperature and velocity units
-                    + " C m "
-                    // skyTemperature
-                    + skyTemperature.ToString("000.00;-00.00;000.00") + " "
-                    // ambient temperature
-                    + temperature.ToString("000.00;-00.00;000.00") + " "
-                    // case temperature
-                    + "        "
-                    // wind speed
-                    + windSpeed.ToString("000.00;-00.00;000.00") + " "
-                    // humidity
-                    + humidity.ToString("000") + " "
-                    // dewpoint
-                    + dewPoint.ToString("000.00;-00.00;000.00") + " "
-                    // heater setting
-                    + "    ";
-
-                string rainFlag = "1";
-                TimeSpan lastRain = DateTime.Now - lastRainIncident;
-                if (lastRain.TotalMinutes <= 2)
-                    rainFlag = "2";
-                if (rainRate > 0)
-                    rainFlag = "3";
-
-                // RainFlag
-                boltwoodLine += rainFlag + " "
-                    // Dry Flag
-                    + rainFlag + " ";
-
-                // time since last update
-                TimeSpan t = timeStamp - lastUpdate;
-                boltwoodLine += t.TotalSeconds.ToString("00000") + " "
-                    // Now() in days. Leaving blank
-                    + "             ";
-
-                string cloudFlag = "1";
-                if (cloudCover > cloudyCond)
-                    cloudFlag = "2";
-                if (cloudCover > veryCloudyCond)
-                    cloudFlag = "3";
-
-                string windFlag = "1";
-                if (windSpeed > windyCond)
-                    windFlag = "2";
-                if (windSpeed > veryWindyCond)
-                    windFlag = "3";
-
-                string lightFlag = "1";
-                if (skyBrightness > lightCond)
-                    lightFlag = "2";
-                if (skyBrightness > veryLightCond)
-                    lightFlag = "3";
-
-                // various flags
-                boltwoodLine += cloudFlag + " " + windFlag + " " + rainFlag + " " + lightFlag;
-
-                // roof close and alert
-                boltwoodLine += "    ";
-               
-                using (StreamWriter s = File.Create(bwf))
+                if (bwfEnabled)
                 {
-                    s.WriteLine(boltwoodLine);
+                    string boltwoodLine = timeStamp.ToString("yyyy-MM-dd HH:mm:ss.ff")
+                        // Temperature and velocity units
+                        + " C m "
+                        // skyTemperature
+                        + skyTemperature.ToString("000.00;-00.00;000.00") + " "
+                        // ambient temperature
+                        + temperature.ToString("000.00;-00.00;000.00") + " "
+                        // case temperature
+                        + "        "
+                        // wind speed
+                        + windSpeed.ToString("000.00;-00.00;000.00") + " "
+                        // humidity
+                        + humidity.ToString("000") + " "
+                        // dewpoint
+                        + dewPoint.ToString("000.00;-00.00;000.00") + " "
+                        // heater setting
+                        + "    ";
+
+                    string rainFlag = "1";
+                    TimeSpan lastRain = DateTime.Now - lastRainIncident;
+                    if (lastRain.TotalMinutes <= 2)
+                        rainFlag = "2";
+                    if (rainRate > 0)
+                        rainFlag = "3";
+
+                    // RainFlag
+                    boltwoodLine += rainFlag + " "
+                        // Dry Flag
+                        + rainFlag + " ";
+
+                    // time since last update
+                    TimeSpan t = timeStamp - lastUpdate;
+                    boltwoodLine += t.TotalSeconds.ToString("00000") + " "
+                        // Now() in days. Leaving blank
+                        + "             ";
+
+                    string cloudFlag = "1";
+                    if (cloudCover > cloudyCond)
+                        cloudFlag = "2";
+                    if (cloudCover > veryCloudyCond)
+                        cloudFlag = "3";
+
+                    string windFlag = "1";
+                    if (windSpeed > windyCond)
+                        windFlag = "2";
+                    if (windSpeed > veryWindyCond)
+                        windFlag = "3";
+
+                    string lightFlag = "1";
+                    if (skyBrightness > twilightCond)
+                        lightFlag = "2";
+                    if (skyBrightness > daylightCond)
+                        lightFlag = "3";
+
+                    // various flags
+                    boltwoodLine += cloudFlag + " " + windFlag + " " + rainFlag + " " + lightFlag;
+
+                    // roof close and alert
+                    boltwoodLine += "    ";
+
+                    using (FileStream f = File.Create(bwf))
+                    {
+                        StreamWriter s = new StreamWriter(f);
+                        s.WriteLine(boltwoodLine);
+                    }
                 }
 
                 Thread.Sleep(updateInterval * 1000);
@@ -1043,6 +1100,31 @@ namespace ASCOM.Arduino
                 driverProfile.DeviceType = "ObservingConditions";
                 tl.Enabled = Convert.ToBoolean(driverProfile.GetValue(driverID, traceStateProfileName, string.Empty, traceStateDefault));
                 comPort = driverProfile.GetValue(driverID, comPortProfileName, string.Empty, comPortDefault);
+
+                updateInterval = int.Parse(driverProfile.GetValue(driverID, updateIntervalProfileName, string.Empty, updateIntervalDefault.ToString()));
+
+                clearSkies = float.Parse(driverProfile.GetValue(driverID, clearSkiesProfileName, string.Empty, clearSkiesDefault.ToString()));
+                cloudySkies = float.Parse(driverProfile.GetValue(driverID, cloudySkiesProfileName, string.Empty, cloudySkiesDefault.ToString()));
+
+                cloudyCond = int.Parse(driverProfile.GetValue(driverID, cloudyCondProfileName, string.Empty, cloudyCondDefault.ToString()));
+                veryCloudyCond = int.Parse(driverProfile.GetValue(driverID, veryCloudyCondProfileName, string.Empty, veryCloudyCondDefault.ToString()));
+
+                nightVol = float.Parse(driverProfile.GetValue(driverID, nightVolProfileName, string.Empty, nightVolDefault.ToString()));
+                dayVol = float.Parse(driverProfile.GetValue(driverID, dayVolProfileName, string.Empty, dayVolDefault.ToString()));
+
+                nightLux = int.Parse(driverProfile.GetValue(driverID, nightLuxProfileName, string.Empty, nightLuxDefault.ToString()));
+                dayLux = int.Parse(driverProfile.GetValue(driverID, dayLuxProfileName, string.Empty, dayLuxDefault.ToString()));
+
+                twilightCond = int.Parse(driverProfile.GetValue(driverID, twilightCondProfileName, string.Empty, twilightCondDefault.ToString()));
+                daylightCond = int.Parse(driverProfile.GetValue(driverID, daylightCondProfileName, string.Empty, daylightCondDefault.ToString()));
+
+                windyCond = float.Parse(driverProfile.GetValue(driverID, windyCondProfileName, string.Empty, windyCondDefault.ToString()));
+                veryWindyCond = float.Parse(driverProfile.GetValue(driverID, veryWindyCondProfileName, string.Empty, veryWindyCondDefault.ToString()));
+
+                bwf = driverProfile.GetValue(driverID, bwfProfileName, string.Empty, bwfDefault);
+
+                bwfEnabled = Convert.ToBoolean(driverProfile.GetValue(driverID, bwfEnabledProfileName, string.Empty, bwfEnabledDefault.ToString()));
+
             }
         }
 
@@ -1055,8 +1137,33 @@ namespace ASCOM.Arduino
             {
                 driverProfile.DeviceType = "ObservingConditions";
                 driverProfile.WriteValue(driverID, traceStateProfileName, tl.Enabled.ToString());
+
                 driverProfile.WriteValue(driverID, comPortProfileName, comPort.ToString());
-            }
+
+                driverProfile.WriteValue(driverID, updateIntervalProfileName, updateInterval.ToString());
+
+                driverProfile.WriteValue(driverID, clearSkiesProfileName, clearSkies.ToString());
+                driverProfile.WriteValue(driverID, cloudySkiesProfileName,cloudySkies.ToString());
+
+                driverProfile.WriteValue(driverID, cloudyCondProfileName, cloudyCond.ToString());
+                driverProfile.WriteValue(driverID, veryCloudyCondProfileName, veryCloudyCond.ToString());
+
+                driverProfile.WriteValue(driverID, nightVolProfileName, nightVol.ToString());
+                driverProfile.WriteValue(driverID, dayVolProfileName, dayVol.ToString());
+
+                driverProfile.WriteValue(driverID, nightLuxProfileName, nightLux.ToString());
+                driverProfile.WriteValue(driverID, dayLuxProfileName, dayLux.ToString());
+
+                driverProfile.WriteValue(driverID, twilightCondProfileName, twilightCond.ToString());
+                driverProfile.WriteValue(driverID, daylightCondProfileName, daylightCond.ToString());
+
+                driverProfile.WriteValue(driverID, windyCondProfileName, windyCond.ToString());
+                driverProfile.WriteValue(driverID, veryWindyCondProfileName, veryWindyCond.ToString());
+
+                driverProfile.WriteValue(driverID, bwfProfileName, bwf);
+
+                driverProfile.WriteValue(driverID, bwfEnabledProfileName, bwfEnabled.ToString());
+    }
         }
 
         /// <summary>

@@ -63,6 +63,7 @@ namespace ASCOM.Arduino
             this.label15 = new System.Windows.Forms.Label();
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
             this.textBox13 = new System.Windows.Forms.TextBox();
+            this.chkBWF = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.picASCOM)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.SuspendLayout();
@@ -121,7 +122,7 @@ namespace ASCOM.Arduino
             // chkTrace
             // 
             this.chkTrace.AutoSize = true;
-            this.chkTrace.Location = new System.Drawing.Point(270, 622);
+            this.chkTrace.Location = new System.Drawing.Point(542, 618);
             this.chkTrace.Margin = new System.Windows.Forms.Padding(8, 7, 8, 7);
             this.chkTrace.Name = "chkTrace";
             this.chkTrace.Size = new System.Drawing.Size(164, 36);
@@ -307,7 +308,7 @@ namespace ASCOM.Arduino
             // 
             // textBox9
             // 
-            this.textBox9.Location = new System.Drawing.Point(1152, 406);
+            this.textBox9.Location = new System.Drawing.Point(1152, 337);
             this.textBox9.Name = "textBox9";
             this.textBox9.Size = new System.Drawing.Size(233, 38);
             this.textBox9.TabIndex = 29;
@@ -316,7 +317,7 @@ namespace ASCOM.Arduino
             // label11
             // 
             this.label11.AutoSize = true;
-            this.label11.Location = new System.Drawing.Point(944, 406);
+            this.label11.Location = new System.Drawing.Point(944, 337);
             this.label11.Name = "label11";
             this.label11.Size = new System.Drawing.Size(121, 32);
             this.label11.TabIndex = 28;
@@ -324,7 +325,7 @@ namespace ASCOM.Arduino
             // 
             // textBox10
             // 
-            this.textBox10.Location = new System.Drawing.Point(478, 400);
+            this.textBox10.Location = new System.Drawing.Point(478, 331);
             this.textBox10.Name = "textBox10";
             this.textBox10.Size = new System.Drawing.Size(233, 38);
             this.textBox10.TabIndex = 27;
@@ -333,7 +334,7 @@ namespace ASCOM.Arduino
             // label12
             // 
             this.label12.AutoSize = true;
-            this.label12.Location = new System.Drawing.Point(230, 400);
+            this.label12.Location = new System.Drawing.Point(230, 331);
             this.label12.Name = "label12";
             this.label12.Size = new System.Drawing.Size(114, 32);
             this.label12.TabIndex = 26;
@@ -341,7 +342,7 @@ namespace ASCOM.Arduino
             // 
             // textBox11
             // 
-            this.textBox11.Location = new System.Drawing.Point(478, 338);
+            this.textBox11.Location = new System.Drawing.Point(478, 400);
             this.textBox11.Name = "textBox11";
             this.textBox11.Size = new System.Drawing.Size(233, 38);
             this.textBox11.TabIndex = 31;
@@ -350,15 +351,15 @@ namespace ASCOM.Arduino
             // label13
             // 
             this.label13.AutoSize = true;
-            this.label13.Location = new System.Drawing.Point(223, 338);
+            this.label13.Location = new System.Drawing.Point(223, 400);
             this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(211, 32);
+            this.label13.Size = new System.Drawing.Size(159, 32);
             this.label13.TabIndex = 30;
-            this.label13.Text = "Twlight Voltage";
+            this.label13.Text = "Twlight Lux";
             // 
             // textBox12
             // 
-            this.textBox12.Location = new System.Drawing.Point(1151, 338);
+            this.textBox12.Location = new System.Drawing.Point(1151, 400);
             this.textBox12.Name = "textBox12";
             this.textBox12.Size = new System.Drawing.Size(233, 38);
             this.textBox12.TabIndex = 33;
@@ -367,11 +368,11 @@ namespace ASCOM.Arduino
             // label14
             // 
             this.label14.AutoSize = true;
-            this.label14.Location = new System.Drawing.Point(908, 344);
+            this.label14.Location = new System.Drawing.Point(908, 406);
             this.label14.Name = "label14";
-            this.label14.Size = new System.Drawing.Size(224, 32);
+            this.label14.Size = new System.Drawing.Size(172, 32);
             this.label14.TabIndex = 32;
-            this.label14.Text = "Daylight Voltage";
+            this.label14.Text = "Daylight Lux";
             // 
             // label15
             // 
@@ -390,11 +391,22 @@ namespace ASCOM.Arduino
             this.textBox13.TabIndex = 35;
             this.textBox13.Click += new System.EventHandler(this.textBox13_Clicked);
             // 
+            // chkBWF
+            // 
+            this.chkBWF.AutoSize = true;
+            this.chkBWF.Location = new System.Drawing.Point(819, 618);
+            this.chkBWF.Name = "chkBWF";
+            this.chkBWF.Size = new System.Drawing.Size(373, 36);
+            this.chkBWF.TabIndex = 36;
+            this.chkBWF.Text = "Generate BoltWood File?";
+            this.chkBWF.UseVisualStyleBackColor = true;
+            // 
             // SetupDialogForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(16F, 31F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1636, 776);
+            this.Controls.Add(this.chkBWF);
             this.Controls.Add(this.textBox13);
             this.Controls.Add(this.label15);
             this.Controls.Add(this.textBox12);
@@ -481,5 +493,6 @@ namespace ASCOM.Arduino
         private System.Windows.Forms.Label label15;
         private System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;
         private System.Windows.Forms.TextBox textBox13;
+        private System.Windows.Forms.CheckBox chkBWF;
     }
 }

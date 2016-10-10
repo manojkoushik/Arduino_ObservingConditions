@@ -25,22 +25,30 @@ namespace ASCOM.Arduino
             // Place any validation constraint checks here
             // Update the state variables with results from the dialogue
             ObservingConditions.comPort = (string)comboBoxComPort.SelectedItem;
+
             ObservingConditions.tl.Enabled = chkTrace.Checked;
+
             ObservingConditions.updateInterval = (int)numericUpDown1.Value;
 
-            ObservingConditions.cloudSlope = (float.Parse(textBox1.Text) - float.Parse(textBox2.Text)) / 100;
+            ObservingConditions.cloudySkies = float.Parse(textBox1.Text);
+            ObservingConditions.clearSkies = float.Parse(textBox2.Text);
             ObservingConditions.cloudyCond = int.Parse(textBox6.Text);
             ObservingConditions.veryCloudyCond = int.Parse(textBox5.Text);
 
-            ObservingConditions.lightSlope = (float.Parse(textBox9.Text) - float.Parse(textBox10.Text)) / (float.Parse(textBox3.Text) - float.Parse(textBox4.Text));
+            ObservingConditions.nightVol = float.Parse(textBox4.Text);
+            ObservingConditions.dayVol = float.Parse(textBox3.Text);
+
+            ObservingConditions.nightLux = int.Parse(textBox10.Text);
+            ObservingConditions.dayLux = int.Parse(textBox9.Text);
+
+            ObservingConditions.twilightCond = int.Parse(textBox11.Text);
+            ObservingConditions.daylightCond = int.Parse(textBox12.Text);
 
             ObservingConditions.windyCond = float.Parse(textBox8.Text);
             ObservingConditions.veryWindyCond = float.Parse(textBox7.Text);
 
-            ObservingConditions.lightCond = float.Parse(textBox11.Text) * ObservingConditions.lightSlope;
-            ObservingConditions.veryLightCond = float.Parse(textBox12.Text) * ObservingConditions.lightSlope;
-
             ObservingConditions.bwf = textBox13.Text;
+            ObservingConditions.bwfEnabled = chkBWF.Checked;
         }
 
         private void cmdCancel_Click(object sender, EventArgs e) // Cancel button event handler
@@ -76,6 +84,29 @@ namespace ASCOM.Arduino
             {
                 comboBoxComPort.SelectedItem = ObservingConditions.comPort;
             }
+
+            textBox1.Text = ObservingConditions.cloudySkies.ToString();
+            textBox2.Text = ObservingConditions.clearSkies.ToString();
+            textBox6.Text = ObservingConditions.cloudyCond.ToString();
+            textBox5.Text = ObservingConditions.veryCloudyCond.ToString();
+
+            textBox4.Text = ObservingConditions.nightVol.ToString();
+            textBox3.Text = ObservingConditions.dayVol.ToString();
+
+            textBox10.Text = ObservingConditions.nightLux.ToString();
+            textBox9.Text = ObservingConditions.dayLux.ToString();
+
+            textBox11.Text = ObservingConditions.twilightCond.ToString();
+            textBox12.Text = ObservingConditions.daylightCond.ToString();
+
+            textBox8.Text = ObservingConditions.windyCond.ToString();
+            textBox7.Text = ObservingConditions.veryWindyCond.ToString();
+
+            textBox13.Text = ObservingConditions.bwf;
+
+            chkBWF.Checked = ObservingConditions.bwfEnabled;
+
+
         }
 
         private void textBox13_Clicked(object sender, EventArgs e)
