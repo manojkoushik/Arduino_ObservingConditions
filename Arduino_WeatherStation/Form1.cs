@@ -402,7 +402,7 @@ namespace ASCOM.Arduino
             {
                 var now = DateTime.Now;
 
-                var before = now.AddMinutes((double)((decimal)-5 * updateInterval.Value / 60));
+                var before = now.AddMinutes((double)((decimal)-100 * updateInterval.Value / 60));
                 // Temperature series
                 var temp = driver.Temperature;
                 var skyTemp = driver.SkyTemperature;
