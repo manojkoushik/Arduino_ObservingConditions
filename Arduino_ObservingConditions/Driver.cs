@@ -31,6 +31,7 @@ using System.Globalization;
 using System.Collections;
 using System.Threading;
 using System.IO;
+using System.IO.Ports;
 
 namespace ASCOM.Arduino
 {
@@ -68,7 +69,7 @@ namespace ASCOM.Arduino
         internal static string traceStateProfileName = "Trace Level"; // Trace Level
         internal static string traceStateDefault = "false";
 
-        internal static int RECEIVE_TIMEOUT = 3;
+        internal static int RECEIVE_TIMEOUT = 30;
 
         internal static string updateIntervalProfileName = "updateInterval"; // How often should we update sensors?
         internal static int updateIntervalDefault = 30;
@@ -130,7 +131,7 @@ namespace ASCOM.Arduino
         internal static string bwfEnabledProfileName = "bwfEnabled"; // Default boltwood file location
         internal static bool bwfEnabledDefault = true;
 
-        private Serial arduino;
+        private SerialPort arduino;
 
         // Variables to hold all the weather measurements. This is updated from the worker thread every so often
         // and also dumped into the boltwood file. 
@@ -149,6 +150,7 @@ namespace ASCOM.Arduino
         DateTime lastRainIncident;
 
         private Thread arduinoThread;
+        private bool arduinoThreadRunning = false;
 
         /// <summary>
         /// Private variable to hold the connected state
@@ -337,9 +339,10 @@ namespace ASCOM.Arduino
 
         public void boltWoodFile()
         {
+            arduinoThreadRunning = true;
             DateTime timeStamp = DateTime.Now;
 
-            while (true)
+            while (this.Connected)
             {
                 DateTime lastUpdate = timeStamp;
                 
@@ -347,12 +350,13 @@ namespace ASCOM.Arduino
                 timeStamp = DateTime.Now;
 
                 LogMessage("BoltWoodFile", "get Humidity");
-                humidity = double.Parse(CommandString("H", false));
+                string hum = CommandString("H", false);
+                humidity = double.Parse(hum);
 
                 LogMessage("BoltWoodFile", "get Pressure");
                 pressure = double.Parse(CommandString("P", false));
-                // Pressure comes in from sensor as kPa. We need to convert to hPa
-                pressure *= 10;
+                // Pressure comes in from sensor as Pa. We need to convert to hPa
+                pressure /= 100;
 
                 LogMessage("BoltWoodFile", "get Temperature");
                 temperature = double.Parse(CommandString("T", false));
@@ -407,6 +411,8 @@ namespace ASCOM.Arduino
                 float cloudSlope = (0-100)/(clearSkies - cloudySkies);
                 float cloudIntercept = 100 - (clearSkies * cloudSlope);
                 cloudCover = cloudIntercept + (cloudSlope * (temperature - skyTemperature));
+                if (cloudCover > 100) cloudCover = 100;
+                if (cloudCover < 0) cloudCover = 0;
 
                 LogMessage("BoltWoodFile", "calc DewPoint");
                 dewPoint = 243.04 * (Math.Log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - Math.Log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
@@ -519,6 +525,8 @@ namespace ASCOM.Arduino
 
                 Thread.Sleep(updateInterval * 1000);
             }
+
+            arduinoThreadRunning = false;
         }
 
         public void CommandBlind(string command, bool raw)
@@ -535,12 +543,10 @@ namespace ASCOM.Arduino
         {
             CheckConnected("CommandString");
 
-            arduino.ClearBuffers();
-            arduino.Transmit(command);
+            arduino.WriteLine(command);
 
-            arduino.ReceiveTimeout = RECEIVE_TIMEOUT;  // Timeout 3 sec
-
-            return arduino.ReceiveTerminated("\n\r");   // Wait for terminated character
+            string response = arduino.ReadLine();
+            return response;   // Wait for terminated character
         }
 
         public void Dispose()
@@ -573,10 +579,9 @@ namespace ASCOM.Arduino
                     LogMessage("Connected Set", "Connecting to port {0}", comPort);
                     try
                     {
-                        arduino = new Serial();
-                        arduino.PortName = comPort;
-                        arduino.Speed = SerialSpeed.ps9600;
-                        arduino.Connected = true;
+                        // This thread will run as long as we are connected
+                        arduino = new SerialPort(comPort, 9600);
+                        arduino.Open();
                         arduinoThread.Start();
                                                
                     }
@@ -591,9 +596,16 @@ namespace ASCOM.Arduino
                 {
                     LogMessage("Connected Unset", "Disconnecting to port {0}", comPort);
 
-                    if (arduino !=null && arduino.Connected)
-                        arduino.Connected = false;
+                    // Before closing connection to Arduino, ask update thread to stop
                     connectedState = false;
+
+                    while (arduinoThreadRunning)
+                    {
+                        Thread.Sleep(1000);
+                    }
+
+                    if (arduino !=null)
+                        arduino.Close();
                 }
             }
         }
