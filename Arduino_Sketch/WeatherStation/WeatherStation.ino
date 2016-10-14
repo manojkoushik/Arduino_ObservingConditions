@@ -112,9 +112,6 @@ void setup()
 {
   Serial.begin(9600);
 
-  // Debug
-  Serial.println("Booting up Weather Station...");
-
   pinMode(STAT1, OUTPUT); //Status LED Blue
   pinMode(STAT2, OUTPUT); //Status LED Green
 
@@ -207,9 +204,6 @@ void setup()
 
   // turn on interrupts
   interrupts();
-
-  // Debug
-  Serial.println("Observatory Weather Station online!");  
 }
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -359,7 +353,7 @@ void WindDirection()
 
   if(winddir > 180) winddir -= 180;
   else winddir += 180;
-  if (windspeed = 0) winddir = 0;
+  if (windspeed == 0) winddir = 0;
   Serial.println(winddir,DEC);
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
