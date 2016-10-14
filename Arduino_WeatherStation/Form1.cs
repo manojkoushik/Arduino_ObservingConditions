@@ -24,11 +24,30 @@ namespace ASCOM.Arduino
             // Set the run flag to true
             graphThreadRunning = true;
 
+
+            #region temperature
+
             // Temperature Plots
-            var tempAxisText = "°c";
+            // Used for cloud calibration
+
+            double lowestTempDiff = 100;
+            double highestTempDiff = 0;
+
+            double highestTemp = double.MinValue;
+            double lowestTemp = double.MaxValue;
+
+            double highestSkyTemp = double.MinValue;
+            double lowestSkyTemp = double.MaxValue;
+
+            var tempUnitsText = "°c";
+            double tempMajorStep = 5;
+            double tempMinorStep = 1;
+
             if (fahrenheit.Checked)
             {
-                tempAxisText = "°f";
+                tempUnitsText = "°f";
+                tempMajorStep = 1;
+                tempMinorStep = 0.1;
             }
 
             // Ambient Temperature
@@ -50,10 +69,10 @@ namespace ASCOM.Arduino
             });
             temperature.Axes.Add(new OxyPlot.Axes.LinearAxis
             {
-                Title = tempAxisText,
+                Title = tempUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5,
-                MinorStep = 1,
+                MajorStep = tempMajorStep,
+                MinorStep = tempMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
@@ -78,10 +97,10 @@ namespace ASCOM.Arduino
             });
             skyTemperature.Axes.Add(new OxyPlot.Axes.LinearAxis
             {
-                Title = tempAxisText,
+                Title = tempUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5,
-                MinorStep = 1,
+                MajorStep = tempMajorStep,
+                MinorStep = tempMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
@@ -106,22 +125,43 @@ namespace ASCOM.Arduino
             });
             tempDiff.Axes.Add(new OxyPlot.Axes.LinearAxis
             {
-                Title = tempAxisText,
+                Title = tempUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5,
-                MinorStep = 1,
+                MajorStep = tempMajorStep,
+                MinorStep = tempMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
             this.tempDiffPlot.Model = tempDiff;
+            #endregion
+
+            #region wind
 
             // Wind items
             // Wind Speed
 
             var windUnitsText = "m/s";
+            double windMajorStep = 5;
+            double windMinorStep = 1;
 
-            if (this.kph.Checked) windUnitsText = "kph";
-            if (this.mph.Checked) windUnitsText = "mph";
+            double windSpeedMax = double.MinValue;
+            double windSpeedMin = double.MaxValue;
+            double windGustMax = double.MinValue;
+            double windGustMin = double.MaxValue;
+
+            if (this.kph.Checked)
+            {
+                windUnitsText = "kph";
+                windMajorStep = 15;
+                windMinorStep = 5;
+            }
+
+            if (this.mph.Checked)
+            {
+                windUnitsText = "mph";
+                windMajorStep = 10;
+                windMinorStep = 2;
+            }
 
             var windSpeedSeries = new LineSeries();
             var windSpeed = new PlotModel
@@ -143,8 +183,8 @@ namespace ASCOM.Arduino
             {
                 Title = windUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5,
-                MinorStep = 1,
+                MajorStep = windMajorStep,
+                MinorStep = windMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
@@ -175,6 +215,8 @@ namespace ASCOM.Arduino
                 MinorStep = 15,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
+                Maximum = 360,
+                Minimum = 0,
             });
             this.windDirPlot.Model = windDirection;
 
@@ -199,21 +241,31 @@ namespace ASCOM.Arduino
             {
                 Title = windUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5,
-                MinorStep = 1,
+                MajorStep = windMajorStep,
+                MinorStep = windMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
             this.windGustPlot.Model = windGust;
 
+            #endregion
+
+            #region rain
+
             // Rain
             double rainMultiplier = 1;
             var rainUnitsText = "mm/Hr";
+            double rainMajorStep = 4;
+            double rainMinorStep = 1;
+            double rainMax = double.MinValue;
+            double rainMin = double.MaxValue;
 
             if (this.inHr.Checked)
             {
                 rainMultiplier = 0.0394;
                 rainUnitsText = "in/Hr";
+                rainMajorStep = 0.16;
+                rainMinorStep = 0.04;
             }
             var rainSeries = new LineSeries();
             var rain = new PlotModel
@@ -235,14 +287,20 @@ namespace ASCOM.Arduino
             {
                 Title = rainUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5,
-                MinorStep = 1,
+                MajorStep = rainMajorStep,
+                MinorStep = rainMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
             this.rainPlot.Model = rain;
+            #endregion
 
+            #region clouds
             // Clouds
+
+            double cloudsMax = double.MinValue;
+            double cloudsMin = double.MaxValue;
+
             var cloudsSeries = new LineSeries();
             var clouds = new PlotModel
             {
@@ -267,10 +325,20 @@ namespace ASCOM.Arduino
                 MinorStep = 5,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
+                Maximum = 100,
+                Minimum = 0,
             });
             this.cloudsPlot.Model = clouds;
+            #endregion
 
+            #region skybrightness
             // Sky Brightness
+
+            double skyBrightnessMax = double.MinValue;
+            double skyBrightnessMin = double.MaxValue;
+            double sbMajorStep = 5000;
+            double sbMinorStep = 1000;
+
             var skyBrightnessSeries = new LineSeries();
             var skyBrightness = new PlotModel
             {
@@ -291,14 +359,22 @@ namespace ASCOM.Arduino
             {
                 Title = "Lux",
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5000,
-                MinorStep = 1000,
+                MajorStep = sbMajorStep,
+                MinorStep = sbMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
+                Maximum = 25000,
+                Minimum = 0,
             });
             this.brightnessPlot.Model = skyBrightness;
+            #endregion
 
+            #region humidity
             // Humidity
+
+            double humidityMax = double.MinValue;
+            double humidityMin = double.MaxValue;
+
             var humiditySeries = new LineSeries();
             var humidity = new PlotModel
             {
@@ -323,10 +399,18 @@ namespace ASCOM.Arduino
                 MinorStep = 5,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
+                Maximum = 100,
+                Minimum = 0,
             });
             this.humidityPlot.Model = humidity;
+            #endregion
 
+            #region dewpt
             // Dew Point
+
+            double dewPtMax = double.MinValue;
+            double dewPtMin = double.MaxValue;
+
             var dewPointSeries = new LineSeries();
             var dewPoint = new PlotModel
             {
@@ -345,28 +429,32 @@ namespace ASCOM.Arduino
             });
             dewPoint.Axes.Add(new OxyPlot.Axes.LinearAxis
             {
-                Title = tempAxisText,
+                Title = tempUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 5,
-                MinorStep = 1,
+                MajorStep = tempMajorStep,
+                MinorStep = tempMinorStep,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
             this.dewPtPlot.Model = dewPoint;
+            #endregion
 
+            #region pressure
             // Pressure
             double pressureMult = 1;
             var pressureUnitsText = "hPa";
+            double pressureMax = double.MinValue;
+            double pressureMin = double.MaxValue;
 
             if (this.pascals.Checked)
             {
-                pressureMult *= 100;
+                pressureMult = 100;
                 pressureUnitsText = "Pa";
             }
 
             if (this.kiloPascals.Checked)
             {
-                pressureMult *= 0.1;
+                pressureMult = 0.1;
                 pressureUnitsText = "kPa";
             }
 
@@ -390,34 +478,69 @@ namespace ASCOM.Arduino
             {
                 Title = pressureUnitsText,
                 AxislineStyle = LineStyle.Solid,
-                MajorStep = 100,
-                MinorStep = 10,
+                MajorStep = 100*pressureMult,
+                MinorStep = 10*pressureMult,
                 MajorGridlineStyle = LineStyle.Dash,
                 MinorGridlineStyle = LineStyle.Dot,
             });
             this.pressurePlot.Model = pressure;
+            #endregion
 
+            // give ourselves some time so arduino is connected
+            Thread.Sleep(3000);
+
+            #region graph update loop
             // Start updating graphs
             while (graphThreadRun)
             {
                 var now = DateTime.Now;
 
                 var before = now.AddMinutes((double)((decimal)-100 * updateInterval.Value / 60));
+
+                #region temp
                 // Temperature series
-                var temp = driver.Temperature;
-                var skyTemp = driver.SkyTemperature;
-                var dewPt = driver.DewPoint;
+                double temp = driver.Temperature;
+                double skyTemp = driver.SkyTemperature;
+                double dewPt = driver.DewPoint;
 
                 if (fahrenheit.Checked)
                 {
-                    temp -= 32;
-                    skyTemp -= 32;
-                    dewPt -= 32;
+                    temp *= 1.8;
+                    skyTemp *= 1.8;
+                    dewPt *= 1.8;
 
-                    temp *= 5 / 9;
-                    skyTemp *= 5 / 9;
-                    dewPt *= 5 / 9;
+                    temp += 32;
+                    skyTemp += 32;
+                    dewPt += 32;
                 }
+
+                if (temp < lowestTemp) lowestTemp = temp;
+                if (temp > highestTemp) highestTemp = temp;
+
+                if (skyTemp < lowestSkyTemp) lowestSkyTemp = skyTemp;
+                if (skyTemp > highestSkyTemp) highestSkyTemp = skyTemp;
+
+                double diff = temp - skyTemp;
+                if (diff < lowestTempDiff) lowestTempDiff = diff;
+                if (diff > highestTempDiff) highestTempDiff = diff;
+
+                tempDiff.LegendTitle = "Cur:"+diff.ToString("F2") + tempUnitsText +
+                    " Low:" + lowestTempDiff.ToString("F2") + tempUnitsText + 
+                    " High:" + highestTempDiff.ToString("F2") + tempUnitsText;
+                tempDiff.Axes[1].Maximum = highestTempDiff + tempMajorStep;
+                tempDiff.Axes[1].Minimum = lowestTempDiff - tempMajorStep;
+
+                temperature.LegendTitle = "Cur:" + temp.ToString("F2") + tempUnitsText +
+                    " Low:" + lowestTemp.ToString("F2") + tempUnitsText + 
+                    " High:" + highestTemp.ToString("F2") + tempUnitsText;
+                temperature.Axes[1].Maximum = highestTemp + tempMajorStep;
+                temperature.Axes[1].Minimum = lowestTemp - tempMajorStep;
+
+                skyTemperature.LegendTitle = "Cur:" + skyTemp.ToString("F2") + tempUnitsText + 
+                    " Low:" + lowestSkyTemp.ToString("F2") + tempUnitsText + 
+                    " High:" + highestSkyTemp.ToString("F2") + tempUnitsText;
+                skyTemperature.Axes[1].Maximum = highestSkyTemp + tempMajorStep;
+                skyTemperature.Axes[1].Minimum = lowestSkyTemp - tempMajorStep;
 
                 tempSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), temp));
                 temperature.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
@@ -427,10 +550,12 @@ namespace ASCOM.Arduino
                 skyTemperature.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.skyTempPlot.InvalidatePlot(true);
 
-                tempDiffSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), temp - skyTemp));
+                tempDiffSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), diff));
                 tempDiff.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.tempDiffPlot.InvalidatePlot(true);
+                #endregion
 
+                #region wind
                 //Wind Series
                 var wSpeed = driver.WindSpeed;
                 var wGust = driver.WindGust;
@@ -447,6 +572,24 @@ namespace ASCOM.Arduino
                     wGust *= 2.24;
                 }
 
+                if (wSpeed < windSpeedMin) windSpeedMin = wSpeed;
+                if (wSpeed > windSpeedMax) windSpeedMax = wSpeed;
+
+                if (wGust < windGustMin) windGustMin = wGust;
+                if (wSpeed > windGustMax) windGustMax = wGust;
+
+                windSpeed.LegendTitle = "Cur:" + wSpeed.ToString("F2") + windUnitsText +
+                    " Low:" + windSpeedMin.ToString("F2") + windUnitsText  + 
+                    " High:" + windSpeedMax.ToString("F2") + windUnitsText;
+                windSpeed.Axes[1].Maximum = windSpeedMax + windMajorStep;
+                windSpeed.Axes[1].Minimum = windSpeedMin - windMinorStep;
+
+                windGust.LegendTitle = "Cur:" + wGust.ToString("F2") + windUnitsText +
+                    " Low:" + windGustMin.ToString("F2") + windUnitsText + 
+                    " High:" + windGustMax.ToString("F2") + windUnitsText;
+                windGust.Axes[1].Maximum = windGustMax + windMajorStep;
+                windGust.Axes[1].Minimum = windGustMin - windMinorStep;
+
                 windSpeedSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), wSpeed));
                 windSpeed.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.windSpeedPlot.InvalidatePlot(true);
@@ -455,42 +598,125 @@ namespace ASCOM.Arduino
                 windGust.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.windGustPlot.InvalidatePlot(true);
 
-                windDirectionSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), driver.WindDirection));
+                double wDir = driver.WindDirection;
+                windDirection.LegendTitle = "Cur:" + wDir.ToString("F2") + "°";
+
+                windDirectionSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), wDir));
                 windDirection.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.windDirPlot.InvalidatePlot(true);
+                #endregion
 
+                #region rain
                 // Rain
-                rainSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), driver.RainRate * rainMultiplier));
+
+                var rainVal = driver.RainRate * rainMultiplier;
+
+                if (rainVal > rainMax) rainMax = rainVal;
+                if (rainVal < rainMin) rainMin = rainVal;
+
+                rain.LegendTitle = "Cur:" + rainVal.ToString("F2") + rainUnitsText +
+                    " Low:" + rainMin.ToString("F2") + rainUnitsText + 
+                    " High:" + rainMax.ToString("F2") + rainUnitsText;
+                rain.Axes[1].Maximum = rainMax + rainMajorStep;
+                rain.Axes[1].Minimum = rainMin - rainMinorStep;
+
+                rainSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), rainVal));
                 rain.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.rainPlot.InvalidatePlot(true);
+                #endregion
 
+                #region clouds
                 // Clouds
-                cloudsSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), driver.CloudCover));
+
+                double c = driver.CloudCover;
+
+                if (c > cloudsMax) cloudsMax = c;
+                if (c < cloudsMin) cloudsMin = c;
+
+                clouds.LegendTitle = "Cur:" + c.ToString("F2") +
+                    "% Low:" + cloudsMin.ToString("F2") + 
+                    "% High:" + cloudsMax.ToString("F2") + "%";
+
+                cloudsSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), c));
                 clouds.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.cloudsPlot.InvalidatePlot(true);
+                #endregion
 
+                #region sky brightness
                 // Sky Brightness
-                skyBrightnessSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), driver.SkyBrightness));
+                double sb = driver.SkyBrightness;
+
+                if (sb > skyBrightnessMax) skyBrightnessMax = sb;
+                if (sb < skyBrightnessMin) skyBrightnessMin = sb;
+
+                skyBrightness.LegendTitle = "Cur:" + sb.ToString("F2") + 
+                    "Lux Low:" + skyBrightnessMin.ToString("F2") + 
+                    "Lux High:" + skyBrightnessMax.ToString("F2") + "Lux";
+                skyBrightness.Axes[1].Maximum = skyBrightnessMax + sbMajorStep;
+                skyBrightness.Axes[1].Minimum =  skyBrightnessMin - sbMajorStep;
+
+                skyBrightnessSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), sb));
                 skyBrightness.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.brightnessPlot.InvalidatePlot(true);
+                #endregion
 
+                #region humidity
                 // Humidity
-                humiditySeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), driver.Humidity));
+                double h = driver.Humidity;
+
+                if (h > humidityMax) humidityMax = h;
+                if (h < humidityMin) humidityMin = h;
+
+                humidity.LegendTitle = "Cur:" + h.ToString("F2") +
+                    "% Low:" + humidityMin.ToString("F2") + 
+                    "% High:" + humidityMax.ToString("F2") + "%";
+
+                humiditySeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), h));
                 humidity.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.humidityPlot.InvalidatePlot(true);
+                #endregion
 
+                #region dew point
                 // Dew Point
+
+                if (dewPt < dewPtMin) dewPtMin = dewPt;
+                if (dewPt > dewPtMax) dewPtMax = dewPt;
+
+                dewPoint.LegendTitle = "Cur:" + dewPt.ToString("F2") + tempUnitsText +
+                    " Low:" + dewPtMin.ToString("F2") + tempUnitsText + 
+                    " High:" + dewPtMax.ToString("F2") + tempUnitsText;
+                dewPoint.Axes[1].Maximum = dewPtMax + tempMajorStep;
+                dewPoint.Axes[1].Minimum = dewPtMin - tempMajorStep;
+
                 dewPointSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), dewPt));
                 dewPoint.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.dewPtPlot.InvalidatePlot(true);
+                #endregion
 
+                #region pressure
                 // Pressure
-                pressureSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), driver.Pressure * pressureMult));
+
+                double p = driver.Pressure;
+
+                p *= pressureMult;
+
+                if (p < pressureMin) pressureMin = p;
+                if (p > pressureMax) pressureMax = p;
+
+                pressure.LegendTitle = "Cur:" + p.ToString("F2") + pressureUnitsText + 
+                    " Low:" + pressureMin.ToString("F2") + pressureUnitsText + 
+                    " High:" + pressureMax.ToString("F2") + pressureUnitsText;
+                pressure.Axes[1].Maximum = pressureMax + 100*pressureMult;
+                pressure.Axes[1].Minimum = pressureMin - 100*pressureMult;
+
+                pressureSeries.Points.Add(new DataPoint(OxyPlot.Axes.DateTimeAxis.ToDouble(now), p));
                 pressure.Axes[0].Minimum = OxyPlot.Axes.DateTimeAxis.ToDouble(before);
                 this.pressurePlot.InvalidatePlot(true);
+                #endregion
 
                 Thread.Sleep((int)this.updateInterval.Value * 1000);
             }
+            #endregion
 
             // Indicate that this thread has not stopped
             graphThreadRunning = false;

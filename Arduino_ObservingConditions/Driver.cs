@@ -76,15 +76,15 @@ namespace ASCOM.Arduino
         internal static int updateInterval;
 
         internal static string clearSkiesProfileName = "clearSkies"; // When is it clear?
-        internal static float clearSkiesDefault = 60;
+        internal static float clearSkiesDefault = 25;
         internal static float clearSkies;
 
-        internal static string cloudySkiesProfileName = "cloudySkiese"; // when is it cloudy?
-        internal static float cloudySkiesDefault = 20;
+        internal static string cloudySkiesProfileName = "cloudySkies"; // when is it cloudy?
+        internal static float cloudySkiesDefault = 2;
         internal static float cloudySkies;
 
         internal static string cloudyCondProfileName = "cloudyCond"; // What defines a Cloudy Condition?
-        internal static int cloudyCondDefault = 30;
+        internal static int cloudyCondDefault = 50;
         internal static int cloudyCond;
 
         internal static string veryCloudyCondProfileName = "veryCloudyCond"; // What defines a Very Cloudy Condition?
@@ -117,11 +117,11 @@ namespace ASCOM.Arduino
 
         internal static float windyCond;
         internal static string windyCondProfileName = "windyCond"; // What defines a windy condition
-        internal static float windyCondDefault = 5;
+        internal static float windyCondDefault = 4.2F;
 
         internal static float veryWindyCond;
         internal static string veryWindyCondProfileName = "veryWindyCond"; // what defines a very windy condition
-        internal static float veryWindyCondDefault = 20;
+        internal static float veryWindyCondDefault = 8.4F;
 
         internal static string bwf;
         internal static string bwfProfileName = "bwf"; // Default boltwood file location
@@ -408,8 +408,8 @@ namespace ASCOM.Arduino
                 skyBrightness = (int)(lightSlope * double.Parse(CommandString("SB", false)));
 
                 LogMessage("BoltWoodFile", "calc CloudCover");
-                float cloudSlope = (0-100)/(clearSkies - cloudySkies);
-                float cloudIntercept = 100 - (clearSkies * cloudSlope);
+                double cloudSlope = (0-100)/(clearSkies - cloudySkies);
+                double cloudIntercept = 100 - (cloudySkies * cloudSlope);
                 cloudCover = cloudIntercept + (cloudSlope * (temperature - skyTemperature));
                 if (cloudCover > 100) cloudCover = 100;
                 if (cloudCover < 0) cloudCover = 0;
@@ -464,7 +464,7 @@ namespace ASCOM.Arduino
                         // ambient temperature
                         + temperature.ToString("000.00;-00.00;000.00") + " "
                         // case temperature
-                        + "        "
+                        + " 000000 "
                         // wind speed
                         + windSpeed.ToString("000.00;-00.00;000.00") + " "
                         // humidity
@@ -472,7 +472,7 @@ namespace ASCOM.Arduino
                         // dewpoint
                         + dewPoint.ToString("000.00;-00.00;000.00") + " "
                         // heater setting
-                        + "    ";
+                        + " 000 ";
 
                     string rainFlag = "1";
                     TimeSpan lastRain = DateTime.Now - lastRainIncident;
@@ -490,7 +490,7 @@ namespace ASCOM.Arduino
                     TimeSpan t = timeStamp - lastUpdate;
                     boltwoodLine += t.TotalSeconds.ToString("00000") + " "
                         // Now() in days. Leaving blank
-                        + "             ";
+                        + " 000000000000 ";
 
                     string cloudFlag = "1";
                     if (cloudCover > cloudyCond)
@@ -514,12 +514,12 @@ namespace ASCOM.Arduino
                     boltwoodLine += cloudFlag + " " + windFlag + " " + rainFlag + " " + lightFlag;
 
                     // roof close and alert
-                    boltwoodLine += "    ";
+                    boltwoodLine += " 0 0";
 
                     using (FileStream f = File.Create(bwf))
                     {
-                        StreamWriter s = new StreamWriter(f);
-                        s.WriteLine(boltwoodLine);
+                        using (StreamWriter s = new StreamWriter(f))
+                            s.WriteLine(boltwoodLine);
                     }
                 }
 
