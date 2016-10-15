@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.label4 = new System.Windows.Forms.Label();
@@ -579,7 +580,7 @@
             0,
             0});
             this.updateInterval.Minimum = new decimal(new int[] {
-            15,
+            5,
             0,
             0,
             0});
@@ -666,6 +667,7 @@
             this.AutoSize = true;
             this.ClientSize = new System.Drawing.Size(1934, 1502);
             this.Controls.Add(this.tabControl1);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(8, 7, 8, 7);
             this.Name = "Form1";
             this.Text = "Arduino Weather Station";
