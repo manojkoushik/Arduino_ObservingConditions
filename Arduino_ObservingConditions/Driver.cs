@@ -80,7 +80,7 @@ namespace ASCOM.Arduino
         internal static float clearSkies;
 
         internal static string cloudySkiesProfileName = "cloudySkies"; // when is it cloudy?
-        internal static float cloudySkiesDefault = 2;
+        internal static float cloudySkiesDefault = 10;
         internal static float cloudySkies;
 
         internal static string cloudyCondProfileName = "cloudyCond"; // What defines a Cloudy Condition?
@@ -97,7 +97,7 @@ namespace ASCOM.Arduino
 
         internal static float dayVol;
         internal static string dayVolProfileName = "dayVoltage"; // when is it day?
-        internal static float dayVolDefault = 4;
+        internal static float dayVolDefault = 5;
 
         internal static int nightLux;
         internal static string nightLuxProfileName = "nightLux"; // when is it dark?
@@ -105,15 +105,15 @@ namespace ASCOM.Arduino
 
         internal static int dayLux;
         internal static string dayLuxProfileName = "dayLux"; // when is it day?
-        internal static int dayLuxDefault = 25000;
+        internal static int dayLuxDefault = 12000;
 
         internal static int twilightCond;
         internal static string twilightCondProfileName = "twilightCond"; // what defines a light condition
-        internal static int twilightCondDefault = 1;
+        internal static int twilightCondDefault = 200;
 
         internal static int daylightCond;
         internal static string daylightCondProfileName = "daylightCond"; // what defines a very light condition
-        internal static int daylightCondDefault = 3;
+        internal static int daylightCondDefault = 10000;
 
         internal static float windyCond;
         internal static string windyCondProfileName = "windyCond"; // What defines a windy condition
