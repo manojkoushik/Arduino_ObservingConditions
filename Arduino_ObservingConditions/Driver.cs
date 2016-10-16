@@ -187,8 +187,6 @@ namespace ASCOM.Arduino
             utilities = new Util(); //Initialise util object
             astroUtilities = new AstroUtils(); // Initialise astro utilities object
 
-            arduinoThread = new Thread(this.boltWoodFile);
-
             tl.LogMessage("ObservingConditions", "Completed initialisation");
         }
 
@@ -582,6 +580,8 @@ namespace ASCOM.Arduino
                         // This thread will run as long as we are connected
                         arduino = new SerialPort(comPort, 9600);
                         arduino.Open();
+
+                        arduinoThread = new Thread(this.boltWoodFile);
                         arduinoThread.Start();
                                                
                     }
@@ -604,8 +604,14 @@ namespace ASCOM.Arduino
                         Thread.Sleep(1000);
                     }
 
-                    if (arduino !=null)
+                    arduinoThread = null;
+
+                    if (arduino != null)
+                    {
                         arduino.Close();
+                        arduino.Dispose();
+                        arduino = null;
+                    }
                 }
             }
         }
