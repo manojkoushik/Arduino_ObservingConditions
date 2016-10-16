@@ -770,7 +770,8 @@ namespace ASCOM.Arduino
             }
             else
             {
-                driver = new ASCOM.DriverAccess.ObservingConditions(Properties.Settings.Default.DriverId);
+                if (driver == null)
+                    driver = new ASCOM.DriverAccess.ObservingConditions(Properties.Settings.Default.DriverId);
                 driver.Connected = true;
 
                 // Disable all unit settings before starting graph updates in a thread
