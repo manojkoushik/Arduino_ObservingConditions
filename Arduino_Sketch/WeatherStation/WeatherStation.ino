@@ -42,7 +42,8 @@ const byte REFERENCE_3V3 = A3;
 const byte LIGHT = A1;
 const byte BATT = A2;
 const byte WDIR = A0;
-
+const byte RG11 = 10;
+const byte HDS10 = 9;
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Constants
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -121,6 +122,9 @@ void setup()
   pinMode(REFERENCE_3V3, INPUT);
   pinMode(LIGHT, INPUT);
 
+  pinMode(RG11, INPUT); // Hydreon RG11 for rain sensing. Remember to divide the voltage down before consuming as input
+  pinMode(HDS10, INPUT); // HDS10 for condensation sensing
+  
   //Configure the pressure sensor
   myPressure.begin(); // Get sensor online
   myPressure.setModeBarometer(); // Measure pressure in Pascals from 20 to 110 kPa
@@ -172,6 +176,8 @@ void setup()
                                                  // where East=90.0, South=180.0, West=270.0 and North=360.0
   myDeviceCmd.addCommand("WG", WindGust); // Wind gust (Ascom needs m/s) Peak 3 second wind speed over the last 2 minutes
   myDeviceCmd.addCommand("WS", WindSpeed); // Wind speed (Ascom needs m/s)
+  myDeviceCmd.addCommand("RD", RainDetect); // Rain Detect through RG11
+  myDeviceCmd.addCommand("CD", CondensationDetect); // Rain Detect through RG11
   //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
 
@@ -239,6 +245,16 @@ void SkyBrightnessDescription()
 // Ascom command handlers
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
+void RainDetect()
+{
+  Serial.println(digitalRead(RG11));
+}
+
+void CondensationDetect()
+{
+  Serial.println(digitalRead(HDS10));
+}
+
 void Humidity()
 {
   Serial.println(myHumidity.readHumidity(),5);
@@ -253,7 +269,7 @@ void RainRate()
 {
   float rainRate;
 
-  for (int i; i < RAIN_PERIOD; i++)
+  for (int i = 0; i < RAIN_PERIOD; i++)
     rainRate += rainHour[i];
 
   Serial.println(rainRate,5);

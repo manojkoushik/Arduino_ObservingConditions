@@ -131,6 +131,14 @@ namespace ASCOM.Arduino
         internal static string bwfEnabledProfileName = "bwfEnabled"; // Default boltwood file location
         internal static bool bwfEnabledDefault = true;
 
+        internal static bool rg11Enabled;
+        internal static string rg11EnabledProfileName = "rg11Enabled"; // Default boltwood file location
+        internal static bool rg11EnabledDefault = true;
+
+        internal static bool hds10Enabled;
+        internal static string hds10EnabledProfileName = "hds10Enabled"; // Default boltwood file location
+        internal static bool hds10EnabledDefault = true;
+
         private SerialPort arduino;
 
         // Variables to hold all the weather measurements. This is updated from the worker thread every so often
@@ -148,6 +156,9 @@ namespace ASCOM.Arduino
         double windDirection = 0;
         double windGust = 0;
         DateTime lastRainIncident;
+        DateTime lastCondIncident;
+        string rainDetect = "0";
+        string condensationDetect = "0";
 
         private Thread arduinoThread;
         private bool arduinoThreadRunning = false;
@@ -372,8 +383,6 @@ namespace ASCOM.Arduino
                 rainRate = double.Parse(CommandString("RR", false));
                 // Sensor reports inches/hour. We need to convert to mm/hour
                 rainRate *= 25.4;
-                if (rainRate > 0)
-                    lastRainIncident = DateTime.Now;
 
                 LogMessage("BoltWoodFile", "get WindSpeed");
                 windSpeed = double.Parse(CommandString("WS", false));
@@ -387,6 +396,37 @@ namespace ASCOM.Arduino
 
                 LogMessage("BoltWoodFile", "get WindDirection");
                 windDirection = double.Parse(CommandString("WD", false));
+
+                // If RG11 is being used, use that to detect rain, 
+                // otherwise use the rainbucket and rain rate
+                if (rg11Enabled)
+                {
+                    LogMessage("BoltWoodFile", "get RainDetect");
+                    rainDetect = CommandString("RD", false);
+                } else
+                {
+                    LogMessage("BoltWoodFile", "RainDetect using RainRate");
+                    if (rainRate > 0)
+                        rainDetect = "1";
+                }
+
+                if (rainDetect.Equals("1"))
+                    lastRainIncident = DateTime.Now;
+
+                // if hds10 is used, use that to detect condensation
+                if (hds10Enabled)
+                {
+                    LogMessage("BoltWoodFile", "get CondensationDetect");
+                    condensationDetect = CommandString("CD", false);
+                } else
+                {
+                    LogMessage("BoltWoodFile", "CondensationDetect using RainRate");
+                    if (rainRate > 0)
+                        condensationDetect = "1"; 
+                }
+
+                if (condensationDetect.Equals("1"))
+                    lastCondIncident = DateTime.Now;
 
                 // Sky brightness (Ascom needs Lux, but arduino is returning voltage. Calibration settings are used to convert
                 // 0.0001 lux  Moonless, overcast night sky (starlight)
@@ -472,17 +512,76 @@ namespace ASCOM.Arduino
                         // heater setting
                         + " 000 ";
 
-                    string rainFlag = "1";
-                    TimeSpan lastRain = DateTime.Now - lastRainIncident;
-                    if (lastRain.TotalMinutes <= 2)
-                        rainFlag = "2";
-                    if (rainRate > 0)
-                        rainFlag = "3";
+                    // Public Enum CloudCond
+                    // cloudUnknown = 0
+                    // cloudClear = 1
+                    // cloudCloudy = 2
+                    // cloudVeryCloudy = 3
+                    //End Enum
+                    string cloudCond = "1";
+                    if (cloudCover > cloudyCond)
+                        cloudCond = "2";
+                    if (cloudCover > veryCloudyCond)
+                        cloudCond = "3";
 
+                    //Public Enum WindCond
+                    // windUnknown = 0
+                    // windCalm = 1
+                    // windWindy = 2
+                    // windVeryWindy = 3
+                    //End Enum
+                    string windCond = "1";
+                    if (windSpeed > windyCond)
+                        windCond = "2";
+                    if (windSpeed > veryWindyCond)
+                        windCond = "3";
+
+                    //Public Enum DayCond
+                    // dayUnknown = 0
+                    // 'Below are based upon thresholds set in the setup window.
+                    // dayDark = 1
+                    // dayLight = 2
+                    // dayVeryLight = 3
+                    //End Enum
+                    string lightCond = "1";
+                    if (skyBrightness > twilightCond)
+                        lightCond = "2";
+                    if (skyBrightness > daylightCond)
+                        lightCond = "3";
+
+                    // R       71    rain flag, = 0 for dry, = 1 for rain in the last minute, = 2 for rain right now
                     // RainFlag
+                    string rainFlag = "0";
+                    TimeSpan lastRain = DateTime.Now - lastRainIncident;
+                    if (lastRain.TotalMinutes <= 1)
+                        rainFlag = "1";
+                    if (rainDetect.Equals("1"))
+                        rainFlag = "2";
+
+                    //Public Enum RainCond
+                    // rainUnknown = 0
+                    // rainDry = 1
+                    // rainWet = 2 'sensor has water on it
+                    // rainRain = 3 'falling rain drops detected
+                    //End Enum
+                    string rainCond = "1";
+                    if (lastRain.TotalMinutes <= 5)
+                        rainFlag = "1";
+                    if (rainDetect.Equals("1"))
+                        rainFlag = "2";
+
+                    // W       73    wet flag, = 0 for dry, = 1 for wet in the last minute, = 2 for wet right now
+                    string wetFlag = "0";
+                    TimeSpan lastWet = DateTime.Now - lastCondIncident;
+                    if (lastWet.TotalMinutes <= 1)
+                        wetFlag = "1";
+                    if (condensationDetect.Equals("1"))
+                        wetFlag = "2";
+
                     boltwoodLine += rainFlag + " "
-                        // Dry Flag
-                        + rainFlag + " ";
+                        // Wetness Flag
+                        + wetFlag + " ";
+
 
                     // time since last update
                     TimeSpan t = timeStamp - lastUpdate;
@@ -490,26 +589,9 @@ namespace ASCOM.Arduino
                         // Now() in days. Leaving blank
                         + " 000000000000 ";
 
-                    string cloudFlag = "1";
-                    if (cloudCover > cloudyCond)
-                        cloudFlag = "2";
-                    if (cloudCover > veryCloudyCond)
-                        cloudFlag = "3";
-
-                    string windFlag = "1";
-                    if (windSpeed > windyCond)
-                        windFlag = "2";
-                    if (windSpeed > veryWindyCond)
-                        windFlag = "3";
-
-                    string lightFlag = "1";
-                    if (skyBrightness > twilightCond)
-                        lightFlag = "2";
-                    if (skyBrightness > daylightCond)
-                        lightFlag = "3";
 
                     // various flags
-                    boltwoodLine += cloudFlag + " " + windFlag + " " + rainFlag + " " + lightFlag;
+                    boltwoodLine += cloudCond + " " + windCond + " " + rainCond + " " + lightCond;
 
                     // roof close and alert
                     boltwoodLine += " 0 0";
@@ -1143,6 +1225,9 @@ namespace ASCOM.Arduino
 
                 bwfEnabled = Convert.ToBoolean(driverProfile.GetValue(driverID, bwfEnabledProfileName, string.Empty, bwfEnabledDefault.ToString()));
 
+                rg11Enabled = Convert.ToBoolean(driverProfile.GetValue(driverID, rg11EnabledProfileName, string.Empty, rg11EnabledDefault.ToString()));
+
+                hds10Enabled = Convert.ToBoolean(driverProfile.GetValue(driverID, hds10EnabledProfileName, string.Empty, hds10EnabledDefault.ToString()));
             }
         }
 
@@ -1181,7 +1266,11 @@ namespace ASCOM.Arduino
                 driverProfile.WriteValue(driverID, bwfProfileName, bwf);
 
                 driverProfile.WriteValue(driverID, bwfEnabledProfileName, bwfEnabled.ToString());
-    }
+
+                driverProfile.WriteValue(driverID, rg11EnabledProfileName, rg11Enabled.ToString());
+
+                driverProfile.WriteValue(driverID, hds10EnabledProfileName, hds10Enabled.ToString());
+            }
         }
 
         /// <summary>

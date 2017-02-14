@@ -64,6 +64,8 @@ namespace ASCOM.Arduino
             this.folderBrowserDialog1 = new System.Windows.Forms.FolderBrowserDialog();
             this.textBox13 = new System.Windows.Forms.TextBox();
             this.chkBWF = new System.Windows.Forms.CheckBox();
+            this.chkHDS10 = new System.Windows.Forms.CheckBox();
+            this.chkRG11 = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.picASCOM)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numericUpDown1)).BeginInit();
             this.SuspendLayout();
@@ -122,12 +124,12 @@ namespace ASCOM.Arduino
             // chkTrace
             // 
             this.chkTrace.AutoSize = true;
-            this.chkTrace.Location = new System.Drawing.Point(542, 618);
+            this.chkTrace.Location = new System.Drawing.Point(74, 618);
             this.chkTrace.Margin = new System.Windows.Forms.Padding(8, 7, 8, 7);
             this.chkTrace.Name = "chkTrace";
-            this.chkTrace.Size = new System.Drawing.Size(164, 36);
+            this.chkTrace.Size = new System.Drawing.Size(180, 36);
             this.chkTrace.TabIndex = 6;
-            this.chkTrace.Text = "Trace on";
+            this.chkTrace.Text = "Trace on?";
             this.chkTrace.UseVisualStyleBackColor = true;
             // 
             // comboBoxComPort
@@ -394,12 +396,33 @@ namespace ASCOM.Arduino
             // chkBWF
             // 
             this.chkBWF.AutoSize = true;
-            this.chkBWF.Location = new System.Drawing.Point(819, 618);
+            this.chkBWF.Location = new System.Drawing.Point(309, 618);
             this.chkBWF.Name = "chkBWF";
             this.chkBWF.Size = new System.Drawing.Size(373, 36);
             this.chkBWF.TabIndex = 36;
             this.chkBWF.Text = "Generate BoltWood File?";
             this.chkBWF.UseVisualStyleBackColor = true;
+            // 
+            // chkHDS10
+            // 
+            this.chkHDS10.AutoSize = true;
+            this.chkHDS10.Location = new System.Drawing.Point(1156, 618);
+            this.chkHDS10.Name = "chkHDS10";
+            this.chkHDS10.Size = new System.Drawing.Size(374, 36);
+            this.chkHDS10.TabIndex = 38;
+            this.chkHDS10.Text = "Use HDS10 for Wetness?";
+            this.chkHDS10.UseVisualStyleBackColor = true;
+            // 
+            // chkRG11
+            // 
+            this.chkRG11.AutoSize = true;
+            this.chkRG11.Location = new System.Drawing.Point(765, 618);
+            this.chkRG11.Margin = new System.Windows.Forms.Padding(8, 7, 8, 7);
+            this.chkRG11.Name = "chkRG11";
+            this.chkRG11.Size = new System.Drawing.Size(315, 36);
+            this.chkRG11.TabIndex = 37;
+            this.chkRG11.Text = "Use RG11 For Rain?";
+            this.chkRG11.UseVisualStyleBackColor = true;
             // 
             // SetupDialogForm
             // 
@@ -407,6 +430,8 @@ namespace ASCOM.Arduino
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.AutoSize = true;
             this.ClientSize = new System.Drawing.Size(1636, 776);
+            this.Controls.Add(this.chkHDS10);
+            this.Controls.Add(this.chkRG11);
             this.Controls.Add(this.chkBWF);
             this.Controls.Add(this.textBox13);
             this.Controls.Add(this.label15);
@@ -495,5 +520,7 @@ namespace ASCOM.Arduino
         private System.Windows.Forms.FolderBrowserDialog folderBrowserDialog1;
         private System.Windows.Forms.TextBox textBox13;
         private System.Windows.Forms.CheckBox chkBWF;
+        private System.Windows.Forms.CheckBox chkHDS10;
+        private System.Windows.Forms.CheckBox chkRG11;
     }
 }
