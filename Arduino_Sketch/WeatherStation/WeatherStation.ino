@@ -9,7 +9,7 @@
  Original sketch based on what was written by Nathan Seidle https://github.com/sparkfun/Weather_Shield
 
  Author: Manoj Koushik (manoj.koushik@gmail.com)
- Version: 1.0.0
+ Version: 1.1.0
 
  License: This code is public domain. Beers and a thank you are always welcome. 
  
@@ -19,14 +19,16 @@
 #include <SparkFunMPL3115A2.h> //Pressure sensor - Search "SparkFun MPL3115" and install from Library Manager
 #include <SparkFunHTU21D.h> //Humidity sensor - Search "SparkFun HTU21D" and install from Library Manager
 #include <SparkFunMLX90614.h> // MLX90614 IR thermometer library https://github.com/sparkfun/SparkFun_MLX90614_Arduino_Library
-#include <SerialCommand.h> // Serial command library https://github.com/kroimon/Arduino-SerialCommand
+
+// Which Serial port on the leonardo?
+#define WRITE Serial
+#define READ Serial
 
 // Weather Objects to read sensors
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 MPL3115A2 myPressure; //Create an instance of the pressure sensor
 HTU21D myHumidity; //Create an instance of the humidity sensor
 IRTherm myIRSkyTemp; // Create an IRTherm object called temp
-SerialCommand myDeviceCmd; // Create a serial command object to deal with Ascom Driver
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Hardware pin definitions
@@ -42,15 +44,15 @@ const byte REFERENCE_3V3 = A3;
 const byte LIGHT = A1;
 const byte BATT = A2;
 const byte WDIR = A0;
-const byte RG11 = 10;
-const byte HDS10 = 9;
+const byte RG11 = 8;
+const byte HDS10 = A5;
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Constants
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 const byte  WINDGUST_MAX_PERIOD = 40;
 const byte  WINDGUST_AVG_PERIOD = 3;
 const byte  RAIN_PERIOD = 60;
-const byte  SWITCH_BOUNCE = 10;
+const byte  SWITCH_BOUNCE = 100;
 const float RAIN_PER_INT = 0.011;
 const int   MSECS_TO_SEC = 1000;
 const byte  SECS_TO_MIN = 60;
@@ -82,7 +84,6 @@ byte  windgust_calc_index = 0; // Index to keep track of these 3 wind speeds
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 //Interrupt routines (these are called by the hardware interrupts, not by the main code)
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
 void rainIRQ()
 // Count rain gauge bucket tips as they occur
 // Activated by the magnet and reed switch in the rain gauge, attached to input D2
@@ -123,7 +124,7 @@ void setup()
   pinMode(LIGHT, INPUT);
 
   pinMode(RG11, INPUT); // Hydreon RG11 for rain sensing. Remember to divide the voltage down before consuming as input
-  pinMode(HDS10, INPUT); // HDS10 for condensation sensing
+  pinMode(HDS10, INPUT_PULLUP); // HDS10 for condensation sensing
   
   //Configure the pressure sensor
   myPressure.begin(); // Get sensor online
@@ -142,61 +143,7 @@ void setup()
 
   myIRSkyTemp.begin(MLX90614_DEFAULT_ADDRESS); // Initialize I2C library and the MLX90614
   myIRSkyTemp.setUnit(TEMP_C); // Set units to Centigrade (alternatively TEMP_C or TEMP_K)
-
-  // Add all command to support Ascom
-  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  myDeviceCmd.addCommand("H", Humidity); // Atmospheric humidity (%)
-  myDeviceCmd.addCommand("P", Pressure); // Atmospheric presure at the observatory (Ascom needs hPa)
-                                       // This must be the pressure at the observatory altitude and not the adjusted pressure at sea level. 
-  myDeviceCmd.addCommand("RR", RainRate); // Rain rate (Ascom needs mm/hour)
-                                       // This property can be interpreted as 0.0 = Dry any positive nonzero value = wet.
-                                       //   Rainfall intensity is classified according to the rate of precipitation:
-                                       //   Light rain — when the precipitation rate is < 2.5 mm (0.098 in) per hour
-                                       //   Moderate rain — when the precipitation rate is between 2.5 mm (0.098 in) - 7.6 mm (0.30 in) or 10 mm (0.39 in) per hour
-                                       //   Heavy rain — when the precipitation rate is > 7.6 mm (0.30 in) per hour, or between 10 mm (0.39 in) and 50 mm (2.0 in) per hour
-                                       //   Violent rain — when the precipitation rate is > 50 mm (2.0 in) per hour
-  myDeviceCmd.addCommand("SB", SkyBrightness); // Sky brightness (Ascom needs Lux, but we are returning voltage. Ascom driver will have to be calibrated)
-                                                 // 0.0001 lux  Moonless, overcast night sky (starlight)
-                                                 // 0.002 lux Moonless clear night sky with airglow
-                                                 // 0.27–1.0 lux  Full moon on a clear night
-                                                 // 3.4 lux Dark limit of civil twilight under a clear sky
-                                                 // 50 lux  Family living room lights (Australia, 1998)
-                                                 // 80 lux  Office building hallway/toilet lighting
-                                                 // 100 lux Very dark overcast day
-                                                 // 320–500 lux Office lighting
-                                                 // 400 lux Sunrise or sunset on a clear day.
-                                                 // 1000 lux  Overcast day; typical TV studio lighting
-                                                 // 10000–25000 lux Full daylight (not direct sun)
-                                                 // 32000–100000 lux  Direct sunlight
-  myDeviceCmd.addCommand("ST", SkyTemperature); // Sky temperature in °C
-  myDeviceCmd.addCommand("T", Temperature); // Temperature in °C
-  myDeviceCmd.addCommand("WD", WindDirection); // Wind direction (degrees, 0..360.0) 
-                                                 // Value of 0.0 is returned when the wind speed is 0.0. 
-                                                 // Wind direction is measured clockwise from north, through east, 
-                                                 // where East=90.0, South=180.0, West=270.0 and North=360.0
-  myDeviceCmd.addCommand("WG", WindGust); // Wind gust (Ascom needs m/s) Peak 3 second wind speed over the last 2 minutes
-  myDeviceCmd.addCommand("WS", WindSpeed); // Wind speed (Ascom needs m/s)
-  myDeviceCmd.addCommand("RD", RainDetect); // Rain Detect through RG11
-  myDeviceCmd.addCommand("CD", CondensationDetect); // Rain Detect through RG11
-  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-
-  // Add commands for Action property of Ascom Driver
-  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-  // Values use the same as regular reads
-
-  // Support for Description
-  myDeviceCmd.addCommand("HD", HumidityDescription);
-  myDeviceCmd.addCommand("PD", PressureDescription);
-  myDeviceCmd.addCommand("STD", SkyTemperatureDescription);
-  myDeviceCmd.addCommand("TD", TemperatureDescription);
-  myDeviceCmd.addCommand("SBD", SkyBrightnessDescription);
-  //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
-
-  // Support for debugging
-  myDeviceCmd.addCommand("PW", printWeather); // Used to debug and print out all weather parameters
-
+  
   // Zero out the arrays
   int i;
   for (i = 0; i < WINDGUST_MAX_PERIOD; i++)
@@ -218,27 +165,27 @@ void setup()
 
 void HumidityDescription()
 {
-  Serial.println("HTU21D");
+  WRITE.println("HTU21D");
 }
 
 void PressureDescription()
 {
-  Serial.println("MPL3115A2");
+  WRITE.println("MPL3115A2");
 }
 
 void SkyTemperatureDescription()
 {
-  Serial.println("MLX90614");
+  WRITE.println("MLX90614");
 }
 
 void TemperatureDescription()
 {
-  Serial.println("MLX90614");
+  WRITE.println("MLX90614");
 }
 
 void SkyBrightnessDescription()
 {
-  Serial.println("ALS-PT19");
+  WRITE.println("ALS-PT19");
 }
 
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -247,22 +194,27 @@ void SkyBrightnessDescription()
 
 void RainDetect()
 {
-  Serial.println(digitalRead(RG11));
+  // If not using hydreon sensor, then print 1 if rainHour[minutes] > 1
+  WRITE.println(digitalRead(RG11));
 }
 
 void CondensationDetect()
 {
-  Serial.println(digitalRead(HDS10));
+  if (analogRead(HDS10) > 1000 || rainHour[minutes] > 0 || digitalRead(RG11) > 0) {
+    WRITE.println("1");
+  } else {
+    WRITE.println("0");
+  }
 }
 
 void Humidity()
 {
-  Serial.println(myHumidity.readHumidity(),5);
+  WRITE.println(myHumidity.readHumidity(),5);
 }
 
 void Pressure()
 {
-  Serial.println(myPressure.readPressure(),5);
+  WRITE.println(myPressure.readPressure(),5);
 }
 
 void RainRate()
@@ -272,12 +224,12 @@ void RainRate()
   for (int i = 0; i < RAIN_PERIOD; i++)
     rainRate += rainHour[i];
 
-  Serial.println(rainRate,5);
+  WRITE.println(rainRate,5);
 }
 
 void SkyBrightness()
 {
-  Serial.println(get_light_level(),5);
+  WRITE.println(get_light_level(),5);
 }
 
 void SkyTemperature()
@@ -285,11 +237,11 @@ void SkyTemperature()
   if (myIRSkyTemp.read()) // Read from the sensor
   { 
     // If the read is successful:
-    Serial.println(myIRSkyTemp.object(),5);
+    WRITE.println(myIRSkyTemp.object(),5);
     float irTempc = myIRSkyTemp.ambient(); // Get updated ambient temperature
   } else
   {
-    Serial.println("");
+    WRITE.println("");
   }
 }
 
@@ -298,10 +250,10 @@ void Temperature()
   if (myIRSkyTemp.read()) // Read from the sensor
   { 
     // If the read is successful:
-    Serial.println(myIRSkyTemp.ambient(),5);
+    WRITE.println(myIRSkyTemp.ambient(),5);
   } else
   {
-    Serial.println("");
+    WRITE.println("");
   }
 }
 
@@ -313,12 +265,12 @@ void WindGust()
     if (windgusts[i] > peakwindgust)
       peakwindgust = windgusts[i];
       
-  Serial.println(peakwindgust,5);
+  WRITE.println(peakwindgust,5);
 }
 
 void WindSpeed()
 {
-  Serial.println(windspeed,5);
+  WRITE.println(windspeed,5);
 }
 
 void WindDirection()
@@ -370,7 +322,7 @@ void WindDirection()
   if(winddir > 180) winddir -= 180;
   else winddir += 180;
   if (windspeed == 0) winddir = 0;
-  Serial.println(winddir,DEC);
+  WRITE.println(winddir,DEC);
 }
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -380,7 +332,6 @@ void loop()
   //Keep track of which minute it is
   if(millis() - lastSecond >= MSECS_TO_SEC)
   {
-
     lastSecond += MSECS_TO_SEC;
 
     // Calculate all weather readings
@@ -390,8 +341,79 @@ void loop()
     // Calc Wind
     calc_wind();
   }
-  
-  myDeviceCmd.readSerial();
+
+  String command = "";
+  if (READ.available() > 0) {
+    command = READ.readStringUntil('\n');
+    if (command.equalsIgnoreCase("H")) {
+      // Atmospheric humidity (%)
+      Humidity();
+    } else if (command.equalsIgnoreCase("P")) {
+      // Atmospheric presure at the observatory (Ascom needs hPa)
+      // This must be the pressure at the observatory altitude and not the adjusted pressure at sea level.
+      Pressure();     
+    } else if (command.equalsIgnoreCase("RR")) {
+      // Rain rate (Ascom needs mm/hour)
+      // This property can be interpreted as 0.0 = Dry any positive nonzero value = wet.
+      //   Rainfall intensity is classified according to the rate of precipitation:
+      //   Light rain — when the precipitation rate is < 2.5 mm (0.098 in) per hour
+      //   Moderate rain — when the precipitation rate is between 2.5 mm (0.098 in) - 7.6 mm (0.30 in) or 10 mm (0.39 in) per hour
+      //   Heavy rain — when the precipitation rate is > 7.6 mm (0.30 in) per hour, or between 10 mm (0.39 in) and 50 mm (2.0 in) per hour
+      //   Violent rain — when the precipitation rate is > 50 mm (2.0 in) per hour
+      RainRate();
+    } else if (command.equalsIgnoreCase("SB")) {
+      // Sky brightness (Ascom needs Lux, but we are returning voltage. Ascom driver will have to be calibrated)
+      // 0.0001 lux  Moonless, overcast night sky (starlight)
+      // 0.002 lux Moonless clear night sky with airglow
+      // 0.27–1.0 lux  Full moon on a clear night
+      // 3.4 lux Dark limit of civil twilight under a clear sky
+      // 50 lux  Family living room lights (Australia, 1998)
+      // 80 lux  Office building hallway/toilet lighting
+      // 100 lux Very dark overcast day
+      // 320–500 lux Office lighting
+      // 400 lux Sunrise or sunset on a clear day.
+      // 1000 lux  Overcast day; typical TV studio lighting
+      // 10000–25000 lux Full daylight (not direct sun)
+      // 32000–100000 lux  Direct sunlight
+      SkyBrightness();      
+    } else if (command.equalsIgnoreCase("ST")) {
+      // Sky temperature in °C
+      SkyTemperature();
+    } else if (command.equalsIgnoreCase("T")) {
+      // Temperature in °C
+      Temperature();
+    } else if (command.equalsIgnoreCase("WD")) {
+      // Wind direction (degrees, 0..360.0) 
+      // Value of 0.0 is returned when the wind speed is 0.0. 
+      // Wind direction is measured clockwise from north, through east, 
+      // where East=90.0, South=180.0, West=270.0 and North=360.0
+      WindDirection();
+    } else if (command.equalsIgnoreCase("WG")) {
+      // Wind gust (Ascom needs m/s) Peak 3 second wind speed over the last 2 minutes
+      WindGust();
+    } else if (command.equalsIgnoreCase("WS")) {
+      // Wind speed (Ascom needs m/s)
+      WindSpeed();
+    } else if (command.equalsIgnoreCase("RD")) {
+      // Rain Detect through Hydreon RG11
+      RainDetect();
+    } else if (command.equalsIgnoreCase("CD")) {
+      // Condensation Detect through HDS10
+      CondensationDetect();
+    } else if (command.equalsIgnoreCase("HD")) {
+      HumidityDescription();
+    } else if (command.equalsIgnoreCase("PD")) {
+      PressureDescription();
+    } else if (command.equalsIgnoreCase("STD")) {
+      SkyTemperatureDescription();
+    } else if (command.equalsIgnoreCase("TD")) {
+      TemperatureDescription();
+    } else if (command.equalsIgnoreCase("SBD")) {
+      SkyBrightnessDescription();
+    } else if (command.equalsIgnoreCase("PW")) {
+      printWeather();
+    }
+  }
 }
 
 void calc_rain()
@@ -458,50 +480,58 @@ float get_light_level()
 
 void printWeather()
 {
-  Serial.print("H: ");
+  WRITE.println("*********************");
+  
+  WRITE.print("H: ");
   Humidity();
 
-  Serial.print("P: ");
+  WRITE.print("P: ");
   Pressure();
 
-  Serial.print("RR: ");
+  WRITE.print("RR: ");
   RainRate();
 
-  Serial.print("SB: ");
+  WRITE.print("SB: ");
   SkyBrightness();
 
-  Serial.print("ST: ");
+  WRITE.print("ST: ");
   SkyTemperature();
 
   // Calc Temp
-  Serial.println("T:");
+  WRITE.println("T:");
   // Ambient from humidity sensor
-  Serial.print("\tH: ");
-  Serial.println(myHumidity.readTemperature(),5);
+  WRITE.print("->H: ");
+  WRITE.println(myHumidity.readTemperature(),5);
   // Ambient from pressure sensor
-  Serial.print("\tP: ");
-  Serial.println(myPressure.readTemp(),5);
+  WRITE.print("->P: ");
+  WRITE.println(myPressure.readTemp(),5);
   // Ambient from IR sensor
-  Serial.print("\tIR: ");
+  WRITE.print("->IR: ");
   if (myIRSkyTemp.read()) // Read from the sensor
   { 
     // If the read is successful:
     // Get updated ambient temperature
-    Serial.println(myIRSkyTemp.ambient()); 
+    WRITE.println(myIRSkyTemp.ambient()); 
   } else 
   {
-    Serial.println("");
+    WRITE.println("");
   }
 
-//  Serial.print("Temperature: ");
-//  Temperature();
-
-  Serial.print("WG: ");
+  WRITE.print("WG: ");
   WindGust();
 
-  Serial.print("WS: ");
+  WRITE.print("WS: ");
   WindSpeed();
 
-  Serial.print("WD: ");
+  WRITE.print("WD: ");
   WindDirection();
+
+  WRITE.print("RD: ");
+  RainDetect();
+
+  WRITE.print("CD: ");
+  CondensationDetect();
+  WRITE.println("*********************");
 }
+
+
