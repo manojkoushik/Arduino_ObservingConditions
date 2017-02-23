@@ -131,14 +131,6 @@ namespace ASCOM.Arduino
         internal static string bwfEnabledProfileName = "bwfEnabled"; // Default boltwood file location
         internal static bool bwfEnabledDefault = true;
 
-        internal static bool rg11Enabled;
-        internal static string rg11EnabledProfileName = "rg11Enabled"; // Default boltwood file location
-        internal static bool rg11EnabledDefault = true;
-
-        internal static bool hds10Enabled;
-        internal static string hds10EnabledProfileName = "hds10Enabled"; // Default boltwood file location
-        internal static bool hds10EnabledDefault = true;
-
         private SerialPort arduino;
 
         // Variables to hold all the weather measurements. This is updated from the worker thread every so often
@@ -397,33 +389,16 @@ namespace ASCOM.Arduino
                 LogMessage("BoltWoodFile", "get WindDirection");
                 windDirection = double.Parse(CommandString("WD", false));
 
-                // If RG11 is being used, use that to detect rain, 
-                // otherwise use the rainbucket and rain rate
-                if (rg11Enabled)
-                {
-                    LogMessage("BoltWoodFile", "get RainDetect");
-                    rainDetect = CommandString("RD", false);
-                } else
-                {
-                    LogMessage("BoltWoodFile", "RainDetect using RainRate");
-                    if (rainRate > 0)
-                        rainDetect = "1";
-                }
+               
+                LogMessage("BoltWoodFile", "get RainDetect");
+                rainDetect = CommandString("RD", false);
+              
 
                 if (rainDetect.Equals("1"))
                     lastRainIncident = DateTime.Now;
 
-                // if hds10 is used, use that to detect condensation
-                if (hds10Enabled)
-                {
-                    LogMessage("BoltWoodFile", "get CondensationDetect");
-                    condensationDetect = CommandString("CD", false);
-                } else
-                {
-                    LogMessage("BoltWoodFile", "CondensationDetect using RainRate");
-                    if (rainRate > 0)
-                        condensationDetect = "1"; 
-                }
+                LogMessage("BoltWoodFile", "get CondensationDetect");
+                condensationDetect = CommandString("CD", false);
 
                 if (condensationDetect.Equals("1"))
                     lastCondIncident = DateTime.Now;
@@ -1224,10 +1199,6 @@ namespace ASCOM.Arduino
                 bwf = driverProfile.GetValue(driverID, bwfProfileName, string.Empty, bwfDefault);
 
                 bwfEnabled = Convert.ToBoolean(driverProfile.GetValue(driverID, bwfEnabledProfileName, string.Empty, bwfEnabledDefault.ToString()));
-
-                rg11Enabled = Convert.ToBoolean(driverProfile.GetValue(driverID, rg11EnabledProfileName, string.Empty, rg11EnabledDefault.ToString()));
-
-                hds10Enabled = Convert.ToBoolean(driverProfile.GetValue(driverID, hds10EnabledProfileName, string.Empty, hds10EnabledDefault.ToString()));
             }
         }
 
@@ -1266,10 +1237,6 @@ namespace ASCOM.Arduino
                 driverProfile.WriteValue(driverID, bwfProfileName, bwf);
 
                 driverProfile.WriteValue(driverID, bwfEnabledProfileName, bwfEnabled.ToString());
-
-                driverProfile.WriteValue(driverID, rg11EnabledProfileName, rg11Enabled.ToString());
-
-                driverProfile.WriteValue(driverID, hds10EnabledProfileName, hds10Enabled.ToString());
             }
         }
 
