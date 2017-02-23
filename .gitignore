@@ -243,7 +243,4 @@ ModelManifest.xml
 
 # FAKE - F# Make
 .fake/
-/Arduino_ObservingConditions/Arduino ObservingConditions Setup.exe
-/Arduino_ObservingConditions/Arduino ObservingConditions Setup.iss
-/Arduino_ObservingConditions/Arduino ObservingConditions Test.js
 /Arduino_ObservingConditions/Readme.txt
