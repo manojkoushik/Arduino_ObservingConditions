@@ -362,6 +362,9 @@ namespace ASCOM.Arduino
                 LogMessage("BoltWoodFile", "get Temperature");
                 temperature = double.Parse(CommandString("T", false));
 
+                LogMessage("BoltWoodFile", "calc DewPoint");
+                dewPoint = 243.04 * (Math.Log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - Math.Log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
+
                 LogMessage("BoltWoodFile", "get SkyTemperature");
                 skyTemperature = double.Parse(CommandString("ST", false));
 
@@ -400,6 +403,11 @@ namespace ASCOM.Arduino
                 LogMessage("BoltWoodFile", "get CondensationDetect");
                 condensationDetect = CommandString("CD", false);
 
+                if (temperature < (dewPoint + 1))
+                {
+                    condensationDetect = "1";
+                }
+
                 if (condensationDetect.Equals("1"))
                     lastCondIncident = DateTime.Now;
 
@@ -426,9 +434,6 @@ namespace ASCOM.Arduino
                 cloudCover = cloudIntercept + (cloudSlope * (temperature - skyTemperature));
                 if (cloudCover > 100) cloudCover = 100;
                 if (cloudCover < 0) cloudCover = 0;
-
-                LogMessage("BoltWoodFile", "calc DewPoint");
-                dewPoint = 243.04 * (Math.Log(humidity / 100) + ((17.625 * temperature) / (243.04 + temperature))) / (17.625 - Math.Log(humidity / 100) - ((17.625 * temperature) / (243.04 + temperature)));
 
                 // Date       Time        T V SkyT  AmbT SenT Wind Hum DewPt Hea
                 // 2005-06-03 02:07:23.34 C K -28.5 18.7 22.5 45.3 75  10.3  3
@@ -541,9 +546,9 @@ namespace ASCOM.Arduino
                     //End Enum
                     string rainCond = "1";
                     if (lastRain.TotalMinutes <= 5)
-                        rainFlag = "1";
-                    if (rainDetect.Equals("1"))
                         rainFlag = "2";
+                    if (rainDetect.Equals("1"))
+                        rainFlag = "3";
 
                     // W       73    wet flag, = 0 for dry, = 1 for wet in the last minute, = 2 for wet right now
                     string wetFlag = "0";

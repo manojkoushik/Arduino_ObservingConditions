@@ -52,7 +52,7 @@ const byte HDS10 = A5;
 const byte  WINDGUST_MAX_PERIOD = 40;
 const byte  WINDGUST_AVG_PERIOD = 3;
 const byte  RAIN_PERIOD = 60;
-const byte  SWITCH_BOUNCE = 100;
+const byte  SWITCH_BOUNCE = 10;
 const float RAIN_PER_INT = 0.011;
 const int   MSECS_TO_SEC = 1000;
 const byte  SECS_TO_MIN = 60;
@@ -124,8 +124,8 @@ void setup()
   pinMode(LIGHT, INPUT);
 
   pinMode(RG11, INPUT); // Hydreon RG11 for rain sensing. Remember to divide the voltage down before consuming as input
-  pinMode(HDS10, INPUT_PULLUP); // HDS10 for condensation sensing
-  
+  pinMode(HDS10, INPUT); // HDS10 for condensation sensing
+    
   //Configure the pressure sensor
   myPressure.begin(); // Get sensor online
   myPressure.setModeBarometer(); // Measure pressure in Pascals from 20 to 110 kPa
@@ -191,7 +191,6 @@ void SkyBrightnessDescription()
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // Ascom command handlers
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
 void RainDetect()
 {
   // If not using hydreon sensor, then print 1 if rainHour[minutes] > 1
